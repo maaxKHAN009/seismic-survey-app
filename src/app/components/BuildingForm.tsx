@@ -76,7 +76,7 @@ const Tooltip = ({ text }: { text: string }) => {
   );
 };
 
-// --- Multi-Image Upload (Now with Supabase Storage Support) ---
+// --- Multi-Image Upload (Supabase Storage + Dual Mode) ---
 const ImageUpload = ({ label, value, onChange }: { label: string, value: string[], onChange: (imgs: string[]) => void }) => {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -103,7 +103,6 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: string[
         newUrls.push(publicUrl);
       } else {
         console.error("Upload error:", error);
-        alert("Upload failed for one image.");
       }
     }
     
@@ -133,9 +132,8 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: string[
       >
         <Camera size={28} className={uploading ? 'animate-pulse text-blue-600' : ''} />
         <span className="text-xs font-black uppercase tracking-widest px-4 text-center">
-          {uploading ? 'Uploading to Cloud...' : `Add Photos for ${label}`}
+          {uploading ? 'Syncing to Cloud...' : `Add Photos (Camera or Gallery)`}
         </span>
-        {/* capture="environment" removed to allow Gallery access */}
         <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageChange} />
       </button>
     </div>
@@ -150,14 +148,12 @@ export default function BuildingForm() {
   const [fields, setFields] = useState<CustomField[]>([]);
   const [formData, setFormData] = useState<Record<string, any>>({});
 
-  // Data Management State
   const [reports, setReports] = useState<BuildingReport[]>([]);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [filterDistrict, setFilterDistrict] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingImages, setViewingImages] = useState<string[] | null>(null);
 
-  // Admin Field State
   const [newFieldLabel, setNewFieldLabel] = useState('');
   const [newFieldType, setNewFieldType] = useState<FieldType>('text');
   const [newFieldTooltip, setNewFieldTooltip] = useState('');
@@ -175,42 +171,83 @@ export default function BuildingForm() {
     if (data) setReports(data);
   };
 
+  // --- MULTI-PHOTO EXCEL EXPORT LOGIC ---
   const exportToExcel = async (subset?: BuildingReport[]) => {
     const dataToExport = subset || reports;
     if (dataToExport.length === 0) return alert("No data to export.");
     
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Seismic Survey Data');
-    const allKeys = new Set<string>();
-    dataToExport.forEach(report => { Object.keys(report.full_data).forEach(key => allKeys.add(key)); });
     
-    const dynamicHeaders = Array.from(allKeys);
-    worksheet.columns = [
-      { header: 'DATE', key: 'date', width: 15 },
-      { header: 'BUILDING ID', key: 'building_id', width: 20 },
-      ...dynamicHeaders.map(key => ({ header: key.toUpperCase(), key: key, width: 25 }))
-    ];
+    // 1. Identify all dynamic text fields and the maximum number of photos for image fields
+    const textHeaders = new Set<string>();
+    const imageFields = new Map<string, number>(); // Label -> Max count
 
     dataToExport.forEach(report => {
-      const rowData: any = { date: new Date(report.created_at).toLocaleDateString(), building_id: report.building_id };
-      
-      dynamicHeaders.forEach(header => {
-        const val = report.full_data[header];
-        
-        // Handle Image URLs as Hyperlinks
+      Object.entries(report.full_data).forEach(([key, val]) => {
         if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'string' && val[0].includes('supabase.co')) {
-          rowData[header] = {
-            text: `View ${val.length} Photo(s)`,
-            hyperlink: val[0],
-            tooltip: 'Click to open the first image'
-          };
+          const currentMax = imageFields.get(key) || 0;
+          if (val.length > currentMax) imageFields.set(key, val.length);
         } else {
-          rowData[header] = val;
+          textHeaders.add(key);
         }
       });
+    });
+
+    // 2. Define Columns (Standard + Text + Multi-Photo)
+    const columns: any[] = [
+      { header: 'DATE', key: 'date', width: 15 },
+      { header: 'BUILDING ID', key: 'building_id', width: 20 },
+    ];
+
+    // Add normal text fields
+    Array.from(textHeaders).forEach(header => {
+      columns.push({ header: header.toUpperCase(), key: header, width: 25 });
+    });
+
+    // Add dynamic photo columns for each image field
+    imageFields.forEach((maxCount, label) => {
+      for (let i = 1; i <= maxCount; i++) {
+        columns.push({ 
+          header: `${label.toUpperCase()} - PHOTO ${i}`, 
+          key: `${label}_img_${i}`, 
+          width: 30 
+        });
+      }
+    });
+
+    worksheet.columns = columns;
+
+    // 3. Populate Rows
+    dataToExport.forEach(report => {
+      const rowData: any = { 
+        date: new Date(report.created_at).toLocaleDateString(), 
+        building_id: report.building_id 
+      };
+      
+      // Fill text data
+      textHeaders.forEach(header => {
+        rowData[header] = report.full_data[header];
+      });
+
+      // Fill image links in their specific columns
+      imageFields.forEach((maxCount, label) => {
+        const urls = report.full_data[label];
+        if (Array.isArray(urls)) {
+          urls.forEach((url, index) => {
+            rowData[`${label}_img_${index + 1}`] = {
+              text: 'View Full Image',
+              hyperlink: url,
+              tooltip: 'Click to open in browser'
+            };
+          });
+        }
+      });
+
       worksheet.addRow(rowData);
     });
 
+    // 4. Styling
     worksheet.eachRow((row, rowNumber) => {
       row.eachCell((cell) => {
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
@@ -224,7 +261,7 @@ export default function BuildingForm() {
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `Seismic_Report_${Date.now()}.xlsx`);
+    saveAs(new Blob([buffer]), `Seismic_Survey_Peshawar_${Date.now()}.xlsx`);
   };
 
   const toggleRow = (id: string) => {
@@ -235,16 +272,19 @@ export default function BuildingForm() {
   };
 
   const deleteSelected = async () => {
-    if (!window.confirm(`Delete ${selectedRows.size} building reports forever?`)) return;
+    if (!window.confirm(`Delete ${selectedRows.size} reports?`)) return;
     const { error } = await supabase.from('building_reports').delete().in('id', Array.from(selectedRows));
-    if (!error) { alert("Deleted successfully."); setSelectedRows(new Set()); loadReports(); }
+    if (!error) { setSelectedRows(new Set()); loadReports(); }
   };
 
   const submitReport = async () => {
-    if (!formData['Building ID']) return alert("Building ID is required.");
+    if (!formData['Building ID']) return alert("Building ID required.");
     if (window.confirm(`Submit report for ${formData['Building ID']}?`)) {
-      const { error } = await supabase.from('building_reports').insert([{ building_id: formData['Building ID'], full_data: formData }]);
-      if (!error) { alert("Submitted!"); setFormData({}); loadReports(); }
+      const { error } = await supabase.from('building_reports').insert([{ 
+        building_id: formData['Building ID'], 
+        full_data: formData 
+      }]);
+      if (!error) { alert("Data Synced!"); setFormData({}); loadReports(); }
     }
   };
 
@@ -267,7 +307,6 @@ export default function BuildingForm() {
     await supabase.from('survey_schema').update({ fields: updatedFields }).filter('id', 'neq', '00000000-0000-0000-0000-000000000000');
   };
 
-  // --- UNIVERSAL SEARCH LOGIC ---
   const filteredReports = reports.filter(r => {
     const matchesDistrict = filterDistrict === 'All' || r.full_data['District'] === filterDistrict;
     const searchLower = searchQuery.toLowerCase();
@@ -281,51 +320,51 @@ export default function BuildingForm() {
 
   return (
     <div className="space-y-10 pb-20">
-      {/* Photo Viewer Modal */}
+      {/* Image Gallery Modal */}
       {viewingImages && (
         <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in">
           <button onClick={() => setViewingImages(null)} className="absolute top-6 right-6 text-white bg-white/10 p-3 rounded-full hover:bg-white/20 transition-all"><X /></button>
           <div className="max-w-4xl w-full grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[80vh] overflow-y-auto p-4 custom-scrollbar">
             {viewingImages.map((img, i) => (
-              <img key={i} src={img} className="w-full rounded-2xl shadow-2xl border-4 border-white/10" alt="Building Capture" />
+              <img key={i} src={img} className="w-full rounded-2xl shadow-2xl border-4 border-white/10" alt="Building Scan" />
             ))}
           </div>
         </div>
       )}
 
-      {/* Header Bar */}
+      {/* Control Bar */}
       <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-sm">
         {!isAdmin && <button onClick={() => exportToExcel()} className="text-[10px] font-black bg-white border border-slate-300 px-4 py-2 rounded-xl flex items-center gap-2 text-slate-600 hover:border-blue-400">
-          <FileDown size={14} /> DOWNLOAD EXCEL
+          <FileDown size={14} /> EXPORT RESEARCH DATA
         </button>}
         <button onClick={() => isAdmin ? setIsAdmin(false) : setShowAdminPanel(!showAdminPanel)} className="text-xs font-bold text-slate-400 flex items-center gap-1">
-          <Settings size={14} /> {isAdmin ? 'EXIT ADMIN' : 'ADMIN ACCESS'}
+          <Settings size={14} /> {isAdmin ? 'EXIT ADMIN' : 'ADMIN PANEL'}
         </button>
       </div>
 
       {showAdminPanel && !isAdmin && (
         <div className="bg-white p-6 rounded-3xl border-2 border-dashed border-slate-300 max-w-sm mx-auto shadow-2xl">
-          <input type="password" placeholder="swiss2026" className="w-full p-4 rounded-2xl border mb-4 text-center font-bold text-lg" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <button onClick={() => { if(password === 'swiss2026') {setIsAdmin(true); setShowAdminPanel(false); setPassword('');} else alert('Wrong Password'); }} className="w-full bg-blue-600 text-white p-4 rounded-2xl font-black uppercase tracking-widest">Verify Access</button>
+          <input type="password" placeholder="swiss2026" className="w-full p-4 rounded-2xl border mb-4 text-center font-bold text-lg outline-none" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <button onClick={() => { if(password === 'swiss2026') {setIsAdmin(true); setShowAdminPanel(false); setPassword('');} else alert('Access Denied'); }} className="w-full bg-blue-600 text-white p-4 rounded-2xl font-black uppercase tracking-widest">Authorize</button>
         </div>
       )}
 
-      {/* Admin Power Dashboard */}
+      {/* Admin Dashboard Section */}
       {isAdmin && (
         <div className="space-y-8 animate-in slide-in-from-top-4">
           <div className="bg-white p-8 rounded-[2.5rem] border-2 border-blue-100 shadow-2xl space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <h3 className="text-sm font-black text-blue-900 uppercase flex items-center gap-2"><Database size={18} /> Building Repository</h3>
+              <h3 className="text-sm font-black text-blue-900 uppercase flex items-center gap-2"><Database size={18} /> Field Data Repository</h3>
               <div className="flex gap-2">
-                <button onClick={() => exportToExcel(reports.filter(r => selectedRows.has(r.id)))} disabled={selectedRows.size === 0} className="bg-blue-600 text-white text-[10px] font-bold px-5 py-2.5 rounded-full disabled:opacity-30 shadow-md">EXPORT SELECTED ({selectedRows.size})</button>
-                <button onClick={deleteSelected} disabled={selectedRows.size === 0} className="bg-red-50 text-red-600 text-[10px] font-bold px-4 py-2.5 rounded-full hover:bg-red-100"><Trash2 size={16} /></button>
+                <button onClick={() => exportToExcel(reports.filter(r => selectedRows.has(r.id)))} disabled={selectedRows.size === 0} className="bg-blue-600 text-white text-[10px] font-bold px-5 py-2.5 rounded-full disabled:opacity-30">DOWNLOAD SELECTED</button>
+                <button onClick={deleteSelected} disabled={selectedRows.size === 0} className="bg-red-50 text-red-600 text-[10px] font-bold px-4 py-2.5 rounded-full"><Trash2 size={16} /></button>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative flex-1">
+              <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input type="text" placeholder="Search ID or Field..." className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                <input type="text" placeholder="Global Search..." className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-blue-500" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
               <div className="flex gap-3 items-center bg-slate-50 px-4 py-3.5 rounded-2xl border border-slate-200">
                 <Filter size={16} className="text-slate-400" />
@@ -344,24 +383,24 @@ export default function BuildingForm() {
                   <tr>
                     <th className="p-5 w-10"></th>
                     <th className="p-5">Building ID</th>
-                    <th className="p-5">Details</th>
+                    <th className="p-5">Region</th>
                     <th className="p-5">Photos</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm">
                   {filteredReports.map((report) => {
-                    const images = Object.values(report.full_data).find(v => Array.isArray(v) && v.length > 0 && typeof v[0] === 'string' && v[0].includes('supabase.co')) as string[];
+                    const photos = Object.values(report.full_data).find(v => Array.isArray(v) && v.length > 0 && typeof v[0] === 'string' && v[0].includes('supabase.co')) as string[];
                     return (
                       <tr key={report.id} className={`border-b border-slate-50 transition-colors ${selectedRows.has(report.id) ? 'bg-blue-50/50' : 'hover:bg-slate-50/50'}`}>
                         <td className="p-5"><button onClick={() => toggleRow(report.id)}>{selectedRows.has(report.id) ? <CheckIcon className="text-blue-600" size={20} /> : <Square className="text-slate-200" size={20} />}</button></td>
                         <td className="p-5 font-black text-slate-900">{report.building_id}</td>
                         <td className="p-5 font-bold text-slate-500 text-[10px] uppercase">{report.full_data['District'] || 'General'}</td>
                         <td className="p-5">
-                          {images ? (
-                            <button onClick={() => setViewingImages(images)} className="flex items-center gap-1.5 text-blue-600 font-bold hover:underline">
-                              <Eye size={16} /> View {images.length}
+                          {photos ? (
+                            <button onClick={() => setViewingImages(photos)} className="flex items-center gap-1.5 text-blue-600 font-bold hover:underline">
+                              <Eye size={16} /> View All ({photos.length})
                             </button>
-                          ) : <span className="text-slate-300">No Photos</span>}
+                          ) : <span className="text-slate-300 italic">No Captures</span>}
                         </td>
                       </tr>
                     );
@@ -371,36 +410,36 @@ export default function BuildingForm() {
             </div>
           </div>
 
-          <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 space-y-4">
-            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><PlusCircle size={18} /> Append Survey Schema</h3>
+          <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 space-y-4 shadow-sm">
+            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><PlusCircle size={18} /> Modify Survey Protocol</h3>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <input type="text" placeholder="Label" className="p-4 bg-slate-50 rounded-2xl border text-sm" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
+              <input type="text" placeholder="Field Label" className="p-4 bg-slate-50 rounded-2xl border text-sm" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
               <select className="p-4 bg-slate-50 rounded-2xl border text-sm" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
-                <option value="text">Text Field</option><option value="select">Selection Box</option><option value="checkbox">Toggle</option><option value="image">Camera</option>
+                <option value="text">Input Text</option><option value="select">Dropdown Choice</option><option value="checkbox">Toggle/Check</option><option value="image">Camera Capture</option>
               </select>
-              <input type="text" placeholder="Tooltip" className="p-4 bg-slate-50 rounded-2xl border text-sm" value={newFieldTooltip} onChange={(e) => setNewFieldTooltip(e.target.value)} />
+              <input type="text" placeholder="Helper Tooltip" className="p-4 bg-slate-50 rounded-2xl border text-sm" value={newFieldTooltip} onChange={(e) => setNewFieldTooltip(e.target.value)} />
             </div>
             {newFieldType === 'select' && (
               <div className="bg-slate-50 p-4 rounded-2xl space-y-2 border">
                 {newOptions.map((o, i) => (
                   <div key={i} className="flex gap-2">
-                    <input type="text" className="flex-1 p-2 rounded-lg text-sm" value={o} onChange={(e) => {
+                    <input type="text" className="flex-1 p-2 rounded-lg text-sm border" value={o} onChange={(e) => {
                       const u = [...newOptions]; u[i] = e.target.value; setNewOptions(u);
                     }} />
                     <button onClick={() => setNewOptions(newOptions.filter((_, idx) => idx !== i))} className="text-red-400"><Trash2 size={16} /></button>
                   </div>
                 ))}
-                <button onClick={() => setNewOptions([...newOptions, ''])} className="text-xs font-bold text-blue-600">+ Add Choice</button>
+                <button onClick={() => setNewOptions([...newOptions, ''])} className="text-xs font-bold text-blue-600">+ Add Option</button>
               </div>
             )}
-            <button onClick={addField} className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-black transition-all">DEPLOY PROTOCOL UPDATES</button>
+            <button onClick={addField} className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-black transition-all">PUBLISH PROTOCOL CHANGES</button>
           </div>
         </div>
       )}
 
-      {/* Survey Renderer */}
+      {/* Field Renderer */}
       <div className="grid grid-cols-1 gap-6 relative z-0">
-        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Field Collection Form</h2>
+        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Research Data Entry</h2>
         {fields.map((field) => (
           <div key={field.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm relative">
             <div className="flex justify-between items-start mb-4">
@@ -410,12 +449,12 @@ export default function BuildingForm() {
               {isAdmin && <button onClick={() => removeField(field.id)} className="text-slate-300 hover:text-red-500 p-2"><Trash2 size={16} /></button>}
             </div>
             {field.type === 'text' && (
-              <input type="text" className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl text-slate-900 font-bold outline-none focus:border-blue-500 focus:bg-white transition-all" placeholder={`Enter ${field.label}...`} value={formData[field.label] || ''} onChange={(e) => setFormData({...formData, [field.label]: e.target.value})} />
+              <input type="text" className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl text-slate-900 font-bold outline-none focus:border-blue-500 focus:bg-white transition-all" placeholder={`Value for ${field.label}...`} value={formData[field.label] || ''} onChange={(e) => setFormData({...formData, [field.label]: e.target.value})} />
             )}
             {field.type === 'select' && (
               <div className="relative">
                 <select className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl text-slate-900 font-bold outline-none appearance-none" value={formData[field.label] || ''} onChange={(e) => setFormData({...formData, [field.label]: e.target.value})}>
-                  <option value="">Select Condition</option>
+                  <option value="">Select Option</option>
                   {field.options?.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
                 </select>
                 <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-slate-400" />
@@ -425,7 +464,7 @@ export default function BuildingForm() {
             {field.type === 'checkbox' && (
               <label className="flex items-center gap-4 p-5 bg-slate-50 border-2 border-slate-50 rounded-2xl cursor-pointer hover:bg-blue-50 transition-colors">
                 <input type="checkbox" className="w-6 h-6 accent-blue-600 rounded-lg" checked={!!formData[field.label]} onChange={(e) => setFormData({...formData, [field.label]: e.target.checked})} />
-                <span className="text-slate-900 font-black text-xs uppercase tracking-widest">Verify Technical Observation</span>
+                <span className="text-slate-900 font-black text-xs uppercase tracking-widest">Mark as Verified</span>
               </label>
             )}
           </div>
@@ -433,8 +472,8 @@ export default function BuildingForm() {
       </div>
 
       {!isAdmin && (
-        <button onClick={submitReport} className="w-full bg-blue-600 text-white font-black py-6 rounded-[2.5rem] shadow-2xl hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-sm sticky bottom-6">
-          <CheckSquare size={20} /> Submit Research Packet
+        <button onClick={submitReport} className="w-full bg-blue-600 text-white font-black py-6 rounded-[2.5rem] shadow-2xl hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-sm sticky bottom-6 z-10">
+          <CheckSquare size={20} /> SYNC RESEARCH PACKET
         </button>
       )}
     </div>
