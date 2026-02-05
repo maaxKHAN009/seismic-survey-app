@@ -8,7 +8,7 @@ import { saveAs } from 'file-saver';
 import { 
   Info, Database, Settings, PlusCircle, Trash2, 
   X, CheckSquare, Type, List, Camera, ChevronRight, FileDown, 
-  Filter, Square, CheckSquare as CheckIcon, Search, Eye
+  Filter, Square, CheckSquare as CheckIcon, Search, Eye, Tag
 } from 'lucide-react';
 
 // --- Types ---
@@ -20,6 +20,11 @@ interface CustomField {
   type: FieldType;
   tooltip: string;
   options?: string[];
+}
+
+interface ImageObject {
+  url: string;
+  label: string;
 }
 
 interface BuildingReport {
@@ -76,8 +81,8 @@ const Tooltip = ({ text }: { text: string }) => {
   );
 };
 
-// --- Multi-Image Upload (Supabase Storage + Dual Mode) ---
-const ImageUpload = ({ label, value, onChange }: { label: string, value: string[], onChange: (imgs: string[]) => void }) => {
+// --- Multi-Image Upload (Now with Image Labeling) ---
+const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageObject[], onChange: (imgs: ImageObject[]) => void }) => {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -86,7 +91,7 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: string[
     if (files.length === 0) return;
     
     setUploading(true);
-    const newUrls: string[] = [...value];
+    const newItems: ImageObject[] = [...value];
 
     for (const file of files) {
       const fileExt = file.name.split('.').pop();
@@ -100,25 +105,46 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: string[
         const { data: { publicUrl } } = supabase.storage
           .from('building-photos')
           .getPublicUrl(data.path);
-        newUrls.push(publicUrl);
+        // Default label is "Observation X"
+        newItems.push({ url: publicUrl, label: `Capture ${newItems.length + 1}` });
       } else {
         console.error("Upload error:", error);
       }
     }
     
-    onChange(newUrls);
+    onChange(newItems);
     setUploading(false);
   };
 
+  const updateLabel = (index: number, newLabel: string) => {
+    const updated = [...value];
+    updated[index].label = newLabel;
+    onChange(updated);
+  };
+
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-6">
       {value.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-4">
           {value.map((img, index) => (
-            <div key={index} className="relative aspect-square rounded-xl overflow-hidden shadow-sm group border border-slate-200">
-              <img src={img} alt="Capture" className="w-full h-full object-cover" />
-              <button onClick={() => onChange(value.filter((_, i) => i !== index))} className="absolute top-1 right-1 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                <Trash2 size={14} />
+            <div key={index} className="flex gap-4 items-center bg-slate-50 p-3 rounded-2xl border border-slate-100">
+              <div className="w-20 h-20 rounded-xl overflow-hidden shadow-sm border border-slate-200 flex-shrink-0">
+                <img src={img.url} alt="Capture" className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                  <Tag size={12} /> Photo Label
+                </div>
+                <input 
+                  type="text" 
+                  value={img.label} 
+                  onChange={(e) => updateLabel(index, e.target.value)}
+                  className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-blue-500"
+                  placeholder="e.g., North Wall Crack"
+                />
+              </div>
+              <button onClick={() => onChange(value.filter((_, i) => i !== index))} className="p-2 text-red-400 hover:text-red-600 transition-colors">
+                <Trash2 size={18} />
               </button>
             </div>
           ))}
@@ -132,7 +158,7 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: string[
       >
         <Camera size={28} className={uploading ? 'animate-pulse text-blue-600' : ''} />
         <span className="text-xs font-black uppercase tracking-widest px-4 text-center">
-          {uploading ? 'Syncing to Cloud...' : `Add Photos (Camera or Gallery)`}
+          {uploading ? 'Uploading to Supabase...' : `Capture Photo for ${label}`}
         </span>
         <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageChange} />
       </button>
@@ -171,7 +197,7 @@ export default function BuildingForm() {
     if (data) setReports(data);
   };
 
-  // --- MULTI-PHOTO EXCEL EXPORT LOGIC ---
+  // --- SMART LABELED EXCEL EXPORT ---
   const exportToExcel = async (subset?: BuildingReport[]) => {
     const dataToExport = subset || reports;
     if (dataToExport.length === 0) return alert("No data to export.");
@@ -179,13 +205,12 @@ export default function BuildingForm() {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Seismic Survey Data');
     
-    // 1. Identify all dynamic text fields and the maximum number of photos for image fields
     const textHeaders = new Set<string>();
-    const imageFields = new Map<string, number>(); // Label -> Max count
+    const imageFields = new Map<string, number>();
 
     dataToExport.forEach(report => {
       Object.entries(report.full_data).forEach(([key, val]) => {
-        if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'string' && val[0].includes('supabase.co')) {
+        if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && val[0].url) {
           const currentMax = imageFields.get(key) || 0;
           if (val.length > currentMax) imageFields.set(key, val.length);
         } else {
@@ -194,51 +219,39 @@ export default function BuildingForm() {
       });
     });
 
-    // 2. Define Columns (Standard + Text + Multi-Photo)
     const columns: any[] = [
       { header: 'DATE', key: 'date', width: 15 },
       { header: 'BUILDING ID', key: 'building_id', width: 20 },
     ];
 
-    // Add normal text fields
     Array.from(textHeaders).forEach(header => {
       columns.push({ header: header.toUpperCase(), key: header, width: 25 });
     });
 
-    // Add dynamic photo columns for each image field
     imageFields.forEach((maxCount, label) => {
       for (let i = 1; i <= maxCount; i++) {
-        columns.push({ 
-          header: `${label.toUpperCase()} - PHOTO ${i}`, 
-          key: `${label}_img_${i}`, 
-          width: 30 
-        });
+        columns.push({ header: `${label.toUpperCase()} ${i}`, key: `${label}_img_${i}`, width: 30 });
       }
     });
 
     worksheet.columns = columns;
 
-    // 3. Populate Rows
     dataToExport.forEach(report => {
       const rowData: any = { 
         date: new Date(report.created_at).toLocaleDateString(), 
         building_id: report.building_id 
       };
       
-      // Fill text data
-      textHeaders.forEach(header => {
-        rowData[header] = report.full_data[header];
-      });
+      textHeaders.forEach(header => { rowData[header] = report.full_data[header]; });
 
-      // Fill image links in their specific columns
       imageFields.forEach((maxCount, label) => {
-        const urls = report.full_data[label];
-        if (Array.isArray(urls)) {
-          urls.forEach((url, index) => {
+        const photos = report.full_data[label];
+        if (Array.isArray(photos)) {
+          photos.forEach((photo, index) => {
             rowData[`${label}_img_${index + 1}`] = {
-              text: 'View Full Image',
-              hyperlink: url,
-              tooltip: 'Click to open in browser'
+              text: photo.label || `Photo ${index + 1}`,
+              hyperlink: photo.url,
+              tooltip: 'Click to open high-res evidence'
             };
           });
         }
@@ -247,7 +260,6 @@ export default function BuildingForm() {
       worksheet.addRow(rowData);
     });
 
-    // 4. Styling
     worksheet.eachRow((row, rowNumber) => {
       row.eachCell((cell) => {
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
@@ -257,13 +269,25 @@ export default function BuildingForm() {
           cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
         }
       });
-      row.height = 25;
+      row.height = 30;
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `Seismic_Survey_Peshawar_${Date.now()}.xlsx`);
+    saveAs(new Blob([buffer]), `Seismic_Labeled_Report_${Date.now()}.xlsx`);
   };
 
+  const submitReport = async () => {
+    if (!formData['Building ID']) return alert("Building ID required.");
+    if (window.confirm(`Sync report for ${formData['Building ID']}?`)) {
+      const { error } = await supabase.from('building_reports').insert([{ 
+        building_id: formData['Building ID'], 
+        full_data: formData 
+      }]);
+      if (!error) { alert("Data Synced Securely!"); setFormData({}); loadReports(); }
+    }
+  };
+
+  // ... (Remainder of Admin logic remains the same)
   const toggleRow = (id: string) => {
     const newSelected = new Set(selectedRows);
     if (newSelected.has(id)) newSelected.delete(id);
@@ -275,17 +299,6 @@ export default function BuildingForm() {
     if (!window.confirm(`Delete ${selectedRows.size} reports?`)) return;
     const { error } = await supabase.from('building_reports').delete().in('id', Array.from(selectedRows));
     if (!error) { setSelectedRows(new Set()); loadReports(); }
-  };
-
-  const submitReport = async () => {
-    if (!formData['Building ID']) return alert("Building ID required.");
-    if (window.confirm(`Submit report for ${formData['Building ID']}?`)) {
-      const { error } = await supabase.from('building_reports').insert([{ 
-        building_id: formData['Building ID'], 
-        full_data: formData 
-      }]);
-      if (!error) { alert("Data Synced!"); setFormData({}); loadReports(); }
-    }
   };
 
   const addField = async () => {
@@ -389,7 +402,7 @@ export default function BuildingForm() {
                 </thead>
                 <tbody className="text-sm">
                   {filteredReports.map((report) => {
-                    const photos = Object.values(report.full_data).find(v => Array.isArray(v) && v.length > 0 && typeof v[0] === 'string' && v[0].includes('supabase.co')) as string[];
+                    const photos = Object.values(report.full_data).find(v => Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].url) as ImageObject[];
                     return (
                       <tr key={report.id} className={`border-b border-slate-50 transition-colors ${selectedRows.has(report.id) ? 'bg-blue-50/50' : 'hover:bg-slate-50/50'}`}>
                         <td className="p-5"><button onClick={() => toggleRow(report.id)}>{selectedRows.has(report.id) ? <CheckIcon className="text-blue-600" size={20} /> : <Square className="text-slate-200" size={20} />}</button></td>
@@ -397,10 +410,10 @@ export default function BuildingForm() {
                         <td className="p-5 font-bold text-slate-500 text-[10px] uppercase">{report.full_data['District'] || 'General'}</td>
                         <td className="p-5">
                           {photos ? (
-                            <button onClick={() => setViewingImages(photos)} className="flex items-center gap-1.5 text-blue-600 font-bold hover:underline">
-                              <Eye size={16} /> View All ({photos.length})
+                            <button onClick={() => setViewingImages(photos.map(p => p.url))} className="flex items-center gap-1.5 text-blue-600 font-bold hover:underline">
+                              <Eye size={16} /> View {photos.length} Captures
                             </button>
-                          ) : <span className="text-slate-300 italic">No Captures</span>}
+                          ) : <span className="text-slate-300 italic">No Photos</span>}
                         </td>
                       </tr>
                     );
