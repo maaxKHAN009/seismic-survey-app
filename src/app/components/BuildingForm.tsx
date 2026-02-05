@@ -3,6 +3,7 @@
 import { supabase } from '@/lib/supabase';
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import ExcelJS from 'exceljs';
+// @ts-ignore
 import { saveAs } from 'file-saver';
 import { 
   Info, Database, Settings, PlusCircle, Trash2, 
@@ -103,7 +104,7 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: string[
       <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full py-8 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-blue-50 transition-all text-slate-400">
         <Camera size={28} />
         <span className="text-xs font-black uppercase tracking-widest px-4 text-center">Add Photos for {label}</span>
-        <input type="file" multiple accept="image/*" capture="environment" className="hidden" ref={fileInputRef} onChange={handleImageChange} />
+        <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageChange} />
       </button>
     </div>
   );
