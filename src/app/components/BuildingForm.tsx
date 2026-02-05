@@ -76,17 +76,41 @@ const Tooltip = ({ text }: { text: string }) => {
   );
 };
 
-// --- Multi-Image Upload Component ---
+// --- Multi-Image Upload (Now with Supabase Storage Support) ---
 const ImageUpload = ({ label, value, onChange }: { label: string, value: string[], onChange: (imgs: string[]) => void }) => {
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => { onChange([...value, reader.result as string]); };
-      reader.readAsDataURL(file);
-    });
+    if (files.length === 0) return;
+    
+    setUploading(true);
+    const newUrls: string[] = [...value];
+
+    for (const file of files) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}-${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('building-photos')
+        .upload(fileName, file);
+
+      if (data) {
+        const { data: { publicUrl } } = supabase.storage
+          .from('building-photos')
+          .getPublicUrl(data.path);
+        newUrls.push(publicUrl);
+      } else {
+        console.error("Upload error:", error);
+        alert("Upload failed for one image.");
+      }
+    }
+    
+    onChange(newUrls);
+    setUploading(false);
   };
+
   return (
     <div className="w-full space-y-4">
       {value.length > 0 && (
@@ -101,9 +125,17 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: string[
           ))}
         </div>
       )}
-      <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full py-8 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-blue-50 transition-all text-slate-400">
-        <Camera size={28} />
-        <span className="text-xs font-black uppercase tracking-widest px-4 text-center">Add Photos for {label}</span>
+      <button 
+        type="button" 
+        disabled={uploading}
+        onClick={() => fileInputRef.current?.click()} 
+        className={`w-full py-8 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all ${uploading ? 'bg-slate-50 cursor-wait' : 'hover:bg-blue-50 text-slate-400'}`}
+      >
+        <Camera size={28} className={uploading ? 'animate-pulse text-blue-600' : ''} />
+        <span className="text-xs font-black uppercase tracking-widest px-4 text-center">
+          {uploading ? 'Uploading to Cloud...' : `Add Photos for ${label}`}
+        </span>
+        {/* capture="environment" removed to allow Gallery access */}
         <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageChange} />
       </button>
     </div>
@@ -146,25 +178,39 @@ export default function BuildingForm() {
   const exportToExcel = async (subset?: BuildingReport[]) => {
     const dataToExport = subset || reports;
     if (dataToExport.length === 0) return alert("No data to export.");
+    
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Seismic Survey Data');
     const allKeys = new Set<string>();
     dataToExport.forEach(report => { Object.keys(report.full_data).forEach(key => allKeys.add(key)); });
+    
     const dynamicHeaders = Array.from(allKeys);
     worksheet.columns = [
       { header: 'DATE', key: 'date', width: 15 },
       { header: 'BUILDING ID', key: 'building_id', width: 20 },
       ...dynamicHeaders.map(key => ({ header: key.toUpperCase(), key: key, width: 25 }))
     ];
+
     dataToExport.forEach(report => {
       const rowData: any = { date: new Date(report.created_at).toLocaleDateString(), building_id: report.building_id };
+      
       dynamicHeaders.forEach(header => {
         const val = report.full_data[header];
-        rowData[header] = (Array.isArray(val) && val.length > 0 && typeof val[0] === 'string' && val[0].startsWith('data:image')) 
-          ? `${val.length} Image(s) Attached` : val;
+        
+        // Handle Image URLs as Hyperlinks
+        if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'string' && val[0].includes('supabase.co')) {
+          rowData[header] = {
+            text: `View ${val.length} Photo(s)`,
+            hyperlink: val[0],
+            tooltip: 'Click to open the first image'
+          };
+        } else {
+          rowData[header] = val;
+        }
       });
       worksheet.addRow(rowData);
     });
+
     worksheet.eachRow((row, rowNumber) => {
       row.eachCell((cell) => {
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
@@ -176,6 +222,7 @@ export default function BuildingForm() {
       });
       row.height = 25;
     });
+
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), `Seismic_Report_${Date.now()}.xlsx`);
   };
@@ -220,7 +267,7 @@ export default function BuildingForm() {
     await supabase.from('survey_schema').update({ fields: updatedFields }).filter('id', 'neq', '00000000-0000-0000-0000-000000000000');
   };
 
-  // --- UNIVERSAL SEARCH & FILTER LOGIC ---
+  // --- UNIVERSAL SEARCH LOGIC ---
   const filteredReports = reports.filter(r => {
     const matchesDistrict = filterDistrict === 'All' || r.full_data['District'] === filterDistrict;
     const searchLower = searchQuery.toLowerCase();
@@ -249,7 +296,7 @@ export default function BuildingForm() {
       {/* Header Bar */}
       <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-sm">
         {!isAdmin && <button onClick={() => exportToExcel()} className="text-[10px] font-black bg-white border border-slate-300 px-4 py-2 rounded-xl flex items-center gap-2 text-slate-600 hover:border-blue-400">
-          <FileDown size={14} /> BACKUP DATABASE
+          <FileDown size={14} /> DOWNLOAD EXCEL
         </button>}
         <button onClick={() => isAdmin ? setIsAdmin(false) : setShowAdminPanel(!showAdminPanel)} className="text-xs font-bold text-slate-400 flex items-center gap-1">
           <Settings size={14} /> {isAdmin ? 'EXIT ADMIN' : 'ADMIN ACCESS'}
@@ -303,7 +350,7 @@ export default function BuildingForm() {
                 </thead>
                 <tbody className="text-sm">
                   {filteredReports.map((report) => {
-                    const images = Object.values(report.full_data).find(v => Array.isArray(v) && v.length > 0 && typeof v[0] === 'string' && v[0].startsWith('data:image')) as string[];
+                    const images = Object.values(report.full_data).find(v => Array.isArray(v) && v.length > 0 && typeof v[0] === 'string' && v[0].includes('supabase.co')) as string[];
                     return (
                       <tr key={report.id} className={`border-b border-slate-50 transition-colors ${selectedRows.has(report.id) ? 'bg-blue-50/50' : 'hover:bg-slate-50/50'}`}>
                         <td className="p-5"><button onClick={() => toggleRow(report.id)}>{selectedRows.has(report.id) ? <CheckIcon className="text-blue-600" size={20} /> : <Square className="text-slate-200" size={20} />}</button></td>
@@ -351,6 +398,7 @@ export default function BuildingForm() {
         </div>
       )}
 
+      {/* Survey Renderer */}
       <div className="grid grid-cols-1 gap-6 relative z-0">
         <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Field Collection Form</h2>
         {fields.map((field) => (
