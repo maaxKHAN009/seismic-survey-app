@@ -213,24 +213,21 @@ export default function BuildingForm() {
     setNewFieldLabel(''); setNewFieldTooltip(''); setNewOptions(['']);
   };
 
+  const removeField = async (id: string) => {
+    const updatedFields = fields.filter(f => f.id !== id);
+    setFields(updatedFields);
+    await supabase.from('survey_schema').update({ fields: updatedFields }).filter('id', 'neq', '00000000-0000-0000-0000-000000000000');
+  };
+
   // --- UNIVERSAL SEARCH & FILTER LOGIC ---
   const filteredReports = reports.filter(r => {
-    // 1. Check District Filter
     const matchesDistrict = filterDistrict === 'All' || r.full_data['District'] === filterDistrict;
-
-    // 2. Check Search Query across ALL fields
     const searchLower = searchQuery.toLowerCase();
-    
-    // Check the main ID
     const matchesID = r.building_id.toLowerCase().includes(searchLower);
-
-    // Check every single value inside the dynamic data (text, dropdowns, etc.)
     const matchesData = Object.values(r.full_data).some(val => {
-      // We skip checking images here so the search stays fast
       if (Array.isArray(val)) return false; 
       return String(val).toLowerCase().includes(searchLower);
     });
-
     return matchesDistrict && (matchesID || matchesData);
   });
 
@@ -268,7 +265,6 @@ export default function BuildingForm() {
       {/* Admin Power Dashboard */}
       {isAdmin && (
         <div className="space-y-8 animate-in slide-in-from-top-4">
-          {/* Data Table */}
           <div className="bg-white p-8 rounded-[2.5rem] border-2 border-blue-100 shadow-2xl space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <h3 className="text-sm font-black text-blue-900 uppercase flex items-center gap-2"><Database size={18} /> Building Repository</h3>
@@ -278,11 +274,10 @@ export default function BuildingForm() {
               </div>
             </div>
 
-            {/* Search & Filters */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input type="text" placeholder="Search Building ID (e.g. PS-001)..." className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                <input type="text" placeholder="Search ID or Field..." className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
               <div className="flex gap-3 items-center bg-slate-50 px-4 py-3.5 rounded-2xl border border-slate-200">
                 <Filter size={16} className="text-slate-400" />
@@ -328,7 +323,6 @@ export default function BuildingForm() {
             </div>
           </div>
 
-          {/* Protocol Creator (Moved inside Dashboard) */}
           <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 space-y-4">
             <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><PlusCircle size={18} /> Append Survey Schema</h3>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -356,7 +350,6 @@ export default function BuildingForm() {
         </div>
       )}
 
-      {/* 4. Survey Renderer */}
       <div className="grid grid-cols-1 gap-6 relative z-0">
         <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Field Collection Form</h2>
         {fields.map((field) => (
