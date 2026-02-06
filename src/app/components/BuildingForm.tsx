@@ -366,7 +366,7 @@ export default function BuildingForm() {
     await supabase.from('survey_schema').update({ fields: updated }).filter('id', 'neq', '00000000-0000-0000-0000-000000000000');
   };
 
-  // --- EXCEL EXPORT (Fixed Corruption Issue) ---
+  // --- EXCEL EXPORT (Fixed Hyperlinks) ---
   const exportToExcel = async (subset?: BuildingReport[]) => {
     const dataToExport = subset || reports;
     if (dataToExport.length === 0) return alert("No data.");
@@ -396,15 +396,40 @@ export default function BuildingForm() {
     worksheet.columns = columns;
 
     dataToExport.forEach(r => {
-      const row: any = { date: new Date(r.created_at).toLocaleDateString(), id: r.building_id };
-      textHeaders.forEach(h => row[h] = r.full_data[h]);
+      const rowData: any = { date: new Date(r.created_at).toLocaleDateString(), id: r.building_id };
+      
+      textHeaders.forEach(h => {
+        const val = r.full_data[h];
+        rowData[h] = val ? String(val) : '';
+      });
+
       imageFields.forEach((max, label) => {
         const photos = r.full_data[label];
-        if (Array.isArray(photos)) photos.forEach((p, idx) => {
-          row[`${label}_${idx+1}`] = { text: p.label || `Photo ${idx+1}`, hyperlink: p.url, tooltip: 'View' };
-        });
+        if (Array.isArray(photos)) {
+            photos.forEach((p, idx) => {
+                if (p && p.url) {
+                    rowData[`${label}_${idx+1}`] = { 
+                        text: p.label || `Photo ${idx+1}`, 
+                        hyperlink: p.url, 
+                        tooltip: 'Click to open' 
+                    };
+                }
+            });
+        }
       });
-      worksheet.addRow(row);
+      
+      const row = worksheet.addRow(rowData);
+
+      // Force link styling
+      imageFields.forEach((max, label) => {
+          for(let i=1; i<=max; i++) {
+              const cellKey = `${label}_${i}`;
+              if (rowData[cellKey]) {
+                  const cell = row.getCell(cellKey);
+                  cell.font = { color: { argb: 'FF0000FF' }, underline: true };
+              }
+          }
+      });
     });
 
     worksheet.eachRow((row, i) => {
@@ -416,7 +441,6 @@ export default function BuildingForm() {
       row.height = 30;
     });
 
-    // FIX: ADDED CORRECT MIME TYPE
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     saveAs(blob, `Report_${Date.now()}.xlsx`);
