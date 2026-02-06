@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Seismic Vulnerability Survey | Swiss Research Project",
-  description: "Official data collection portal for structural assessment in Pakistan.",
+  title: "Seismic Survey Portal",
+  description: "Swiss-Funded Structural Assessment Tool",
+  manifest: "/manifest.json", // <--- THIS LINE IS CRITICAL
+  themeColor: "#85144B",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
 };
 
 export default function RootLayout({
@@ -25,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-slate-50`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-[#F8F9FA]`}
       >
         {children}
       </body>
