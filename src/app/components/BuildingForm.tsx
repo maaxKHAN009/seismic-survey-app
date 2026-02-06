@@ -10,7 +10,7 @@ import {
   Info, Database, Settings, PlusCircle, Trash2, 
   X, CheckSquare, Camera, ChevronRight, FileDown, 
   Filter, Square, CheckSquare as CheckIcon, Search, Eye, Tag, Wifi, WifiOff, RefreshCcw, 
-  LayoutGrid, ListFilter, Edit3, Calendar, HardDrive, AlertTriangle, ArrowLeft, ArrowRight
+  LayoutGrid, ListFilter, Edit3, ArrowLeft, ArrowRight
 } from 'lucide-react';
 
 // ==========================================
@@ -290,7 +290,7 @@ export default function BuildingForm() {
       });
     });
 
-    // 2. Clear Cloudflare R2
+    // 2. Clear Cloudflare R2 via API
     if (filesToPurge.length > 0) {
       await fetch('/api/delete-file', { method: 'POST', body: JSON.stringify({ keys: filesToPurge }) });
     }
@@ -356,8 +356,9 @@ export default function BuildingForm() {
       textHeaders.forEach(h => row[h] = r.full_data[h]);
       imageFields.forEach((max, label) => {
         const photos = r.full_data[label];
+        // FIX: CHANGED index to idx to match the parameter
         if (Array.isArray(photos)) photos.forEach((p, idx) => {
-          row[`${label}_${idx+1}`] = { text: p.label || `Photo ${index + 1}`, hyperlink: p.url, tooltip: 'View Evidence' };
+          row[`${label}_${idx+1}`] = { text: p.label || `Photo ${idx + 1}`, hyperlink: p.url, tooltip: 'View Evidence' };
         });
       });
       worksheet.addRow(row);
@@ -466,7 +467,7 @@ export default function BuildingForm() {
                 <ListFilter size={28} /> Master Data Suite
               </h3>
               <div className="flex gap-4">
-                <button onClick={() => exportToExcel(reports.filter(r => selectedRows.has(r.id)))} disabled={selectedRows.size === 0} className="bg-[#001F3F] text-[#39CCCC] px-6 md:px-8 py-3 md:py-4 rounded-full text-[10px] md:text-xs font-black disabled:opacity-30 border-2 border-[#39CCCC] hover:bg-[#111111] hover:scale-105 transition-all">EXPORT SELECTION</button>
+                <button onClick={() => exportToExcel(reports.filter(r => selectedRows.has(r.id)))} disabled={selectedRows.size === 0} className="bg-[#001F3F] text-[#39CCCC] px-6 md:px-8 py-3 md:py-4 rounded-full text-[10px] md:text-xs font-black disabled:opacity-30 border-2 border-[#39CCCC] hover:bg-[#111111] hover:scale-105 transition-all">EXPORT SELECTED</button>
                 <button onClick={deleteSelected} disabled={selectedRows.size === 0} className="bg-[#85144B] text-[#FFFFFF] px-6 md:px-8 py-3 md:py-4 rounded-full text-[10px] md:text-xs font-black disabled:opacity-30 flex items-center gap-2 hover:bg-[#600e35] hover:scale-105 transition-all"><Trash2 size={16} /> PURGE</button>
               </div>
             </div>
@@ -499,7 +500,7 @@ export default function BuildingForm() {
                         </button>
                       </th>
                       <th className="p-6 md:p-8">Building ID</th>
-                      <th className="p-6 md:p-8">Region</th>
+                      <th className="p-6 md:p-8">Assigned Region</th>
                       <th className="p-6 md:p-8">Actions</th>
                     </tr>
                   </thead>
