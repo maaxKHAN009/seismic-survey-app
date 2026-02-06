@@ -12,16 +12,22 @@ const s3Client = new S3Client({
 
 export async function POST(request: NextRequest) {
   try {
-    const { keys } = await request.json(); // Array of filenames
-    if (!keys || keys.length === 0) return NextResponse.json({ success: true });
+    const { keys } = await request.json();
+    
+    if (!keys || keys.length === 0) {
+      return NextResponse.json({ success: true });
+    }
 
     await s3Client.send(new DeleteObjectsCommand({
       Bucket: 'seismic-photos',
-      Delete: { Objects: keys.map((k: string) => ({ Key: k })) }
+      Delete: {
+        Objects: keys.map((k: string) => ({ Key: k })),
+      },
     }));
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: "Purge failed" }, { status: 500 });
+    console.error("R2 Delete Error:", error);
+    return NextResponse.json({ error: "Delete failed" }, { status: 500 });
   }
 }

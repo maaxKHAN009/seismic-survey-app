@@ -260,30 +260,25 @@ export default function BuildingForm() {
           {/* Image Gallery */}
           {formState.images.length > 0 && (
             <div>
-              <h3 className="text-sm sm:text-base lg:text-lg font-bold text-black mb-2">
+              <label className="block text-sm sm:text-base lg:text-lg font-bold text-black mb-2">
                 Uploaded Images
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {formState.images.map((img, index) => (
                   <div
                     key={index}
-                    className="relative rounded-lg sm:rounded-xl overflow-hidden border-2 border-black"
+                    className="relative rounded-lg overflow-hidden group"
                   >
                     <img
                       src={img.url}
-                      alt={img.label}
-                      className="w-full h-20 sm:h-24 lg:h-32 object-cover"
+                      className="w-full h-auto object-cover"
+                      alt={`Uploaded image ${index + 1}`}
                     />
-                    {img.isLocal && (
-                      <div className="absolute top-1 right-1 bg-red-500 text-white text-xs px-2 py-1 rounded">
-                        Offline
-                      </div>
-                    )}
                     <button
                       onClick={() => removeImage(index)}
-                      className="absolute top-1 left-1 bg-black text-yellow-300 rounded-full w-6 h-6 flex items-center justify-center font-bold hover:bg-yellow-300 hover:text-black"
+                      className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-2 shadow-md hover:bg-red-700 transition-all"
                     >
-                      ×
+                      &times;
                     </button>
                   </div>
                 ))}
@@ -291,7 +286,7 @@ export default function BuildingForm() {
             </div>
           )}
 
-          {/* Admin Notes */}
+          {/* Admin Notes (Admin only) */}
           {isAdmin && (
             <div>
               <label className="block text-sm sm:text-base lg:text-lg font-bold text-black mb-2">
@@ -299,29 +294,53 @@ export default function BuildingForm() {
               </label>
               <textarea
                 name="admin_notes"
-                value={formState.admin_notes || ""}
+                value={formState.admin_notes}
                 onChange={handleInputChange}
-                className="w-full bg-black text-yellow-300 border-2 border-yellow-300 rounded-lg sm:rounded-xl p-3 sm:p-4 lg:p-6 text-sm sm:text-base lg:text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-yellow-300 h-20 sm:h-24 lg:h-32 resize-none"
-                placeholder="Enter admin notes"
+                className="w-full bg-black text-yellow-300 border-2 border-yellow-300 rounded-lg sm:rounded-xl p-3 sm:p-4 lg:p-6 text-sm sm:text-base lg:text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-yellow-300"
+                placeholder="Enter any admin notes here"
+                rows={3}
               />
             </div>
           )}
 
           {/* Sync Status */}
-          {syncStatus && (
-            <div className="bg-black text-yellow-300 p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl border-2 border-yellow-300 text-sm sm:text-base lg:text-lg font-bold text-center">
-              {syncStatus}
-            </div>
-          )}
-
-          {/* Submit Button */}
-          <button
-            onClick={runSync}
-            disabled={isSyncing}
-            className="w-full bg-black text-yellow-300 border-2 sm:border-3 lg:border-4 border-yellow-300 rounded-lg sm:rounded-xl p-3 sm:p-4 lg:p-6 text-sm sm:text-base lg:text-2xl font-bold hover:bg-yellow-300 hover:text-black disabled:opacity-50 transition"
-          >
-            {isSyncing ? "Syncing..." : "Submit Report"}
-          </button>
+          <div>
+            <button
+              onClick={runSync}
+              disabled={isSyncing}
+              className="w-full bg-black text-yellow-300 border-2 border-yellow-300 rounded-lg sm:rounded-xl p-3 sm:p-4 lg:p-6 text-sm sm:text-base lg:text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-yellow-300 flex items-center justify-center gap-2"
+            >
+              {isSyncing ? (
+                <svg
+                  className="animate-spin h-5 w-5 text-yellow-300"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx={12}
+                    cy={12}
+                    r={10}
+                    stroke="currentColor"
+                    strokeWidth={4}
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v5l4.5-4.5A10 10 0 0012 2 10 10 0 002 12h2z"
+                  />
+                </svg>
+              ) : (
+                "Sync Report"
+              )}
+            </button>
+            {syncStatus && (
+              <p className="mt-2 text-center text-sm sm:text-base lg:text-lg font-semibold text-black">
+                {syncStatus}
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>

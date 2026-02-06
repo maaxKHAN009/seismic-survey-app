@@ -15,19 +15,23 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     
-    if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+    // Sanitize filename to prevent URL issues
+    const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '')}`;
 
     await s3Client.send(new PutObjectCommand({
       Bucket: 'seismic-photos',
       Key: fileName,
       Body: buffer,
       ContentType: file.type,
+      // ACL: 'public-read' // Uncomment if your bucket isn't public by default
     }));
 
-    // Replace the URL below with your R2 Public Custom Domain or worker URL
+    // Construct the public URL
     const publicUrl = `${process.env.R2_PUBLIC_URL}/${fileName}`;
 
     return NextResponse.json({ url: publicUrl });
