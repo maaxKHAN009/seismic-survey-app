@@ -81,7 +81,7 @@ const Tooltip = ({ text }: { text: string }) => {
   );
 };
 
-// --- Multi-Image Upload (Now with Image Labeling) ---
+// --- Multi-Image Upload (Supabase Storage + Dual Mode) ---
 const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageObject[], onChange: (imgs: ImageObject[]) => void }) => {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -105,7 +105,6 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
         const { data: { publicUrl } } = supabase.storage
           .from('building-photos')
           .getPublicUrl(data.path);
-        // Default label is "Observation X"
         newItems.push({ url: publicUrl, label: `Capture ${newItems.length + 1}` });
       } else {
         console.error("Upload error:", error);
@@ -133,14 +132,14 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
               </div>
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-                  <Tag size={12} /> Photo Label
+                  <Tag size={12} /> Label Details
                 </div>
                 <input 
                   type="text" 
                   value={img.label} 
                   onChange={(e) => updateLabel(index, e.target.value)}
                   className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-blue-500"
-                  placeholder="e.g., North Wall Crack"
+                  placeholder="e.g., South Foundation View"
                 />
               </div>
               <button onClick={() => onChange(value.filter((_, i) => i !== index))} className="p-2 text-red-400 hover:text-red-600 transition-colors">
@@ -158,7 +157,7 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
       >
         <Camera size={28} className={uploading ? 'animate-pulse text-blue-600' : ''} />
         <span className="text-xs font-black uppercase tracking-widest px-4 text-center">
-          {uploading ? 'Uploading to Supabase...' : `Capture Photo for ${label}`}
+          {uploading ? 'Archiving to Cloud...' : `Attach Photos (Camera or Gallery)`}
         </span>
         <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageChange} />
       </button>
@@ -197,13 +196,46 @@ export default function BuildingForm() {
     if (data) setReports(data);
   };
 
+  // --- CLEANUP LOGIC: Delete associated files from Storage ---
+  const deleteSelected = async () => {
+    if (!window.confirm(`Permanently purge ${selectedRows.size} entries and their cloud photos?`)) return;
+
+    // 1. Identify all cloud paths for deletion
+    const pathsToDelete: string[] = [];
+    reports.filter(r => selectedRows.has(r.id)).forEach(report => {
+      Object.values(report.full_data).forEach(val => {
+        if (Array.isArray(val)) {
+          val.forEach((item: any) => {
+            if (item.url && item.url.includes('building-photos')) {
+              const filename = item.url.split('/').pop(); // Extract filename from URL
+              if (filename) pathsToDelete.push(filename);
+            }
+          });
+        }
+      });
+    });
+
+    // 2. Remove files from Supabase Storage
+    if (pathsToDelete.length > 0) {
+      await supabase.storage.from('building-photos').remove(pathsToDelete);
+    }
+
+    // 3. Delete Database rows
+    const { error } = await supabase.from('building_reports').delete().in('id', Array.from(selectedRows));
+    if (!error) { 
+      alert("Database and Cloud Storage Cleaned."); 
+      setSelectedRows(new Set()); 
+      loadReports(); 
+    }
+  };
+
   // --- SMART LABELED EXCEL EXPORT ---
   const exportToExcel = async (subset?: BuildingReport[]) => {
     const dataToExport = subset || reports;
     if (dataToExport.length === 0) return alert("No data to export.");
     
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Seismic Survey Data');
+    const worksheet = workbook.addWorksheet('Seismic Data');
     
     const textHeaders = new Set<string>();
     const imageFields = new Map<string, number>();
@@ -230,18 +262,14 @@ export default function BuildingForm() {
 
     imageFields.forEach((maxCount, label) => {
       for (let i = 1; i <= maxCount; i++) {
-        columns.push({ header: `${label.toUpperCase()} ${i}`, key: `${label}_img_${i}`, width: 30 });
+        columns.push({ header: `${label.toUpperCase()} - ${i}`, key: `${label}_img_${i}`, width: 30 });
       }
     });
 
     worksheet.columns = columns;
 
     dataToExport.forEach(report => {
-      const rowData: any = { 
-        date: new Date(report.created_at).toLocaleDateString(), 
-        building_id: report.building_id 
-      };
-      
+      const rowData: any = { date: new Date(report.created_at).toLocaleDateString(), building_id: report.building_id };
       textHeaders.forEach(header => { rowData[header] = report.full_data[header]; });
 
       imageFields.forEach((maxCount, label) => {
@@ -251,7 +279,7 @@ export default function BuildingForm() {
             rowData[`${label}_img_${index + 1}`] = {
               text: photo.label || `Photo ${index + 1}`,
               hyperlink: photo.url,
-              tooltip: 'Click to open high-res evidence'
+              tooltip: 'View Secure Link'
             };
           });
         }
@@ -283,11 +311,10 @@ export default function BuildingForm() {
         building_id: formData['Building ID'], 
         full_data: formData 
       }]);
-      if (!error) { alert("Data Synced Securely!"); setFormData({}); loadReports(); }
+      if (!error) { alert("Survey Packet Synced."); setFormData({}); loadReports(); }
     }
   };
 
-  // ... (Remainder of Admin logic remains the same)
   const toggleRow = (id: string) => {
     const newSelected = new Set(selectedRows);
     if (newSelected.has(id)) newSelected.delete(id);
@@ -295,17 +322,11 @@ export default function BuildingForm() {
     setSelectedRows(newSelected);
   };
 
-  const deleteSelected = async () => {
-    if (!window.confirm(`Delete ${selectedRows.size} reports?`)) return;
-    const { error } = await supabase.from('building_reports').delete().in('id', Array.from(selectedRows));
-    if (!error) { setSelectedRows(new Set()); loadReports(); }
-  };
-
   const addField = async () => {
     if (!newFieldLabel) return;
     const newField: CustomField = {
       id: Date.now().toString(), label: newFieldLabel, type: newFieldType,
-      tooltip: newFieldTooltip || 'No guidance.',
+      tooltip: newFieldTooltip || 'Guidance required.',
       options: newFieldType === 'select' ? newOptions.filter(o => o.trim() !== '') : undefined,
     };
     const updated = [...fields, newField];
@@ -337,7 +358,7 @@ export default function BuildingForm() {
       {viewingImages && (
         <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in">
           <button onClick={() => setViewingImages(null)} className="absolute top-6 right-6 text-white bg-white/10 p-3 rounded-full hover:bg-white/20 transition-all"><X /></button>
-          <div className="max-w-4xl w-full grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[80vh] overflow-y-auto p-4 custom-scrollbar">
+          <div className="max-w-4xl w-full grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[80vh] overflow-y-auto p-4">
             {viewingImages.map((img, i) => (
               <img key={i} src={img} className="w-full rounded-2xl shadow-2xl border-4 border-white/10" alt="Building Scan" />
             ))}
@@ -362,12 +383,11 @@ export default function BuildingForm() {
         </div>
       )}
 
-      {/* Admin Dashboard Section */}
       {isAdmin && (
         <div className="space-y-8 animate-in slide-in-from-top-4">
           <div className="bg-white p-8 rounded-[2.5rem] border-2 border-blue-100 shadow-2xl space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <h3 className="text-sm font-black text-blue-900 uppercase flex items-center gap-2"><Database size={18} /> Field Data Repository</h3>
+              <h3 className="text-sm font-black text-blue-900 uppercase flex items-center gap-2"><Database size={18} /> Building Repository</h3>
               <div className="flex gap-2">
                 <button onClick={() => exportToExcel(reports.filter(r => selectedRows.has(r.id)))} disabled={selectedRows.size === 0} className="bg-blue-600 text-white text-[10px] font-bold px-5 py-2.5 rounded-full disabled:opacity-30">DOWNLOAD SELECTED</button>
                 <button onClick={deleteSelected} disabled={selectedRows.size === 0} className="bg-red-50 text-red-600 text-[10px] font-bold px-4 py-2.5 rounded-full"><Trash2 size={16} /></button>
@@ -411,9 +431,9 @@ export default function BuildingForm() {
                         <td className="p-5">
                           {photos ? (
                             <button onClick={() => setViewingImages(photos.map(p => p.url))} className="flex items-center gap-1.5 text-blue-600 font-bold hover:underline">
-                              <Eye size={16} /> View {photos.length} Captures
+                              <Eye size={16} /> View {photos.length} Scans
                             </button>
-                          ) : <span className="text-slate-300 italic">No Photos</span>}
+                          ) : <span className="text-slate-300 italic">No Captures</span>}
                         </td>
                       </tr>
                     );
@@ -424,13 +444,13 @@ export default function BuildingForm() {
           </div>
 
           <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 space-y-4 shadow-sm">
-            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><PlusCircle size={18} /> Modify Survey Protocol</h3>
+            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><PlusCircle size={18} /> Protocol Management</h3>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <input type="text" placeholder="Field Label" className="p-4 bg-slate-50 rounded-2xl border text-sm" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
+              <input type="text" placeholder="Field Name" className="p-4 bg-slate-50 rounded-2xl border text-sm" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
               <select className="p-4 bg-slate-50 rounded-2xl border text-sm" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
-                <option value="text">Input Text</option><option value="select">Dropdown Choice</option><option value="checkbox">Toggle/Check</option><option value="image">Camera Capture</option>
+                <option value="text">Input Text</option><option value="select">Selection Box</option><option value="checkbox">Binary Check</option><option value="image">Scientific Capture</option>
               </select>
-              <input type="text" placeholder="Helper Tooltip" className="p-4 bg-slate-50 rounded-2xl border text-sm" value={newFieldTooltip} onChange={(e) => setNewFieldTooltip(e.target.value)} />
+              <input type="text" placeholder="Instruction Tooltip" className="p-4 bg-slate-50 rounded-2xl border text-sm" value={newFieldTooltip} onChange={(e) => setNewFieldTooltip(e.target.value)} />
             </div>
             {newFieldType === 'select' && (
               <div className="bg-slate-50 p-4 rounded-2xl space-y-2 border">
@@ -442,17 +462,17 @@ export default function BuildingForm() {
                     <button onClick={() => setNewOptions(newOptions.filter((_, idx) => idx !== i))} className="text-red-400"><Trash2 size={16} /></button>
                   </div>
                 ))}
-                <button onClick={() => setNewOptions([...newOptions, ''])} className="text-xs font-bold text-blue-600">+ Add Option</button>
+                <button onClick={() => setNewOptions([...newOptions, ''])} className="text-xs font-bold text-blue-600">+ Add Choice</button>
               </div>
             )}
-            <button onClick={addField} className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-black transition-all">PUBLISH PROTOCOL CHANGES</button>
+            <button onClick={addField} className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-black transition-all">PUBLISH SYSTEM UPDATES</button>
           </div>
         </div>
       )}
 
       {/* Field Renderer */}
       <div className="grid grid-cols-1 gap-6 relative z-0">
-        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Research Data Entry</h2>
+        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Active Field Assessment</h2>
         {fields.map((field) => (
           <div key={field.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm relative">
             <div className="flex justify-between items-start mb-4">
@@ -462,12 +482,12 @@ export default function BuildingForm() {
               {isAdmin && <button onClick={() => removeField(field.id)} className="text-slate-300 hover:text-red-500 p-2"><Trash2 size={16} /></button>}
             </div>
             {field.type === 'text' && (
-              <input type="text" className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl text-slate-900 font-bold outline-none focus:border-blue-500 focus:bg-white transition-all" placeholder={`Value for ${field.label}...`} value={formData[field.label] || ''} onChange={(e) => setFormData({...formData, [field.label]: e.target.value})} />
+              <input type="text" className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl text-slate-900 font-bold outline-none focus:border-blue-500 focus:bg-white transition-all" placeholder={`Enter ${field.label}...`} value={formData[field.label] || ''} onChange={(e) => setFormData({...formData, [field.label]: e.target.value})} />
             )}
             {field.type === 'select' && (
               <div className="relative">
                 <select className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl text-slate-900 font-bold outline-none appearance-none" value={formData[field.label] || ''} onChange={(e) => setFormData({...formData, [field.label]: e.target.value})}>
-                  <option value="">Select Option</option>
+                  <option value="">Select Protocol</option>
                   {field.options?.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
                 </select>
                 <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-slate-400" />
@@ -477,7 +497,7 @@ export default function BuildingForm() {
             {field.type === 'checkbox' && (
               <label className="flex items-center gap-4 p-5 bg-slate-50 border-2 border-slate-50 rounded-2xl cursor-pointer hover:bg-blue-50 transition-colors">
                 <input type="checkbox" className="w-6 h-6 accent-blue-600 rounded-lg" checked={!!formData[field.label]} onChange={(e) => setFormData({...formData, [field.label]: e.target.checked})} />
-                <span className="text-slate-900 font-black text-xs uppercase tracking-widest">Mark as Verified</span>
+                <span className="text-slate-900 font-black text-xs uppercase tracking-widest">Verify Technical Observation</span>
               </label>
             )}
           </div>
