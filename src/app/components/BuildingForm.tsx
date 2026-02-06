@@ -40,7 +40,7 @@ interface CustomField {
 interface ImageObject { 
   url: string; 
   label: string; 
-  isLocal?: boolean; // Critical for identifying offline photos
+  isLocal?: boolean; 
 }
 
 interface BuildingReport { 
@@ -51,10 +51,10 @@ interface BuildingReport {
 }
 
 // ==========================================
-// 2. SUB-COMPONENTS (Internal)
+// 2. SUB-COMPONENTS
 // ==========================================
 
-// --- High-Contrast Tooltip (Mobile Optimized) ---
+// --- High-Contrast Tooltip ---
 const Tooltip = ({ text }: { text: string }) => {
   const [isOpen, setIsOpen] = useState(false);
   return (
@@ -86,7 +86,6 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
     const newItems = [...value];
 
     for (const file of files) {
-      // 1. Try Online Upload
       if (navigator.onLine) {
         const formData = new FormData();
         formData.append('file', file);
@@ -100,12 +99,10 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
           saveLocally(file, newItems);
         }
       } else {
-        // 2. Offline: Save Base64
         saveLocally(file, newItems);
       }
     }
     
-    // If online, update immediately. If offline, saveLocally handles the update.
     if (navigator.onLine) {
         onChange(newItems);
         setUploading(false);
@@ -117,7 +114,7 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
     reader.onloadend = () => {
         if (reader.result) {
             items.push({ url: reader.result as string, label: `Offline Img ${items.length + 1}`, isLocal: true });
-            onChange([...items]); // Trigger update
+            onChange([...items]); 
             setUploading(false);
         }
     };
@@ -132,7 +129,6 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
 
   return (
     <div className="space-y-3">
-      {/* Thumbnails Grid */}
       <div className="grid grid-cols-1 gap-2">
         {value.map((img, i) => (
           <div key={i} className={`flex gap-3 p-2 rounded-lg border items-center ${img.isLocal ? 'bg-orange-50 border-orange-300' : 'bg-[#DDDDDD] border-[#AAAAAA]'}`}>
@@ -149,8 +145,6 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
           </div>
         ))}
       </div>
-      
-      {/* Upload Button */}
       <button type="button" onClick={() => fileInputRef.current?.click()} 
         disabled={uploading}
         className={`w-full py-4 md:py-6 border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${uploading ? 'bg-slate-50 border-blue-400' : 'bg-[#FFFFFF] border-[#AAAAAA] hover:bg-slate-50 hover:border-[#85144B]'}`}>
@@ -158,7 +152,6 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
         <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-[#111111]">
           {uploading ? 'Processing...' : 'Add Photos'}
         </span>
-        {/* capture removed to allow Gallery access */}
         <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageChange} />
       </button>
     </div>
@@ -187,6 +180,7 @@ export default function BuildingForm() {
   const [filterDistrict, setFilterDistrict] = useState('All');
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [editingReport, setEditingReport] = useState<BuildingReport | null>(null);
+  const [viewingImages, setViewingImages] = useState<ImageObject[] | null>(null); // NEW: Image Viewer State
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
 
@@ -205,7 +199,6 @@ export default function BuildingForm() {
     window.addEventListener('online', update);
     window.addEventListener('offline', update);
     
-    // Poll for pending offline data
     checkPending();
     const interval = setInterval(checkPending, 3000);
 
@@ -216,7 +209,6 @@ export default function BuildingForm() {
     };
   }, []);
 
-  // --- HELPERS ---
   const checkPending = async () => setPendingCount(await localDB.outbox.count());
   
   const loadSchema = async () => { 
@@ -229,27 +221,23 @@ export default function BuildingForm() {
     if(data) setReports(data); 
   };
 
-  // --- SMART SYNC (The "Heavy Lifting" Logic) ---
+  // --- SMART SYNC LOGIC ---
   const runSync = async () => {
     if (!isOnline || syncing) return;
     setSyncing(true);
-    
     try {
       const pending = await localDB.outbox.toArray();
       
       for (const report of pending) {
-        // Deep clone data to modify it
         const processedData = JSON.parse(JSON.stringify(report.full_data));
         
-        // Scan for local images and upload them
         for (const key in processedData) {
             const val = processedData[key];
-            if (Array.isArray(val) && val.length > 0 && val[0].isLocal) {
+            if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && val[0].isLocal) {
                 const uploadedImages: ImageObject[] = [];
                 
                 for (const img of val) {
                     if (img.isLocal) {
-                        // Convert Base64 -> Blob -> File
                         const res = await fetch(img.url);
                         const blob = await res.blob();
                         const file = new File([blob], `offline-${Date.now()}.jpg`, { type: "image/jpeg" });
@@ -257,7 +245,6 @@ export default function BuildingForm() {
                         const formData = new FormData();
                         formData.append('file', file);
                         
-                        // Upload to R2
                         const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
                         const uploadData = await uploadRes.json();
                         
@@ -272,7 +259,6 @@ export default function BuildingForm() {
             }
         }
 
-        // Insert cleaned data to Supabase
         const { error } = await supabase.from('building_reports').insert([{ 
           building_id: report.building_id, 
           full_data: processedData,
@@ -284,17 +270,17 @@ export default function BuildingForm() {
       
       await checkPending(); 
       loadReports(); 
-      alert(`Successfully synced ${pending.length} reports.`);
+      alert(`Sync Complete! ${pending.length} reports uploaded.`);
     } catch (e) {
       console.error(e);
-      alert("Sync failed. Check connection.");
+      alert("Sync interrupted. Check connection.");
     } finally {
       setSyncing(false);
     }
   };
 
   const submitReport = async () => {
-    if (!formData['Building ID']) return alert("Building ID Required.");
+    if (!formData['Building ID']) return alert("Critical: Building ID Required.");
     const entry = { building_id: formData['Building ID'], full_data: formData, timestamp: Date.now() };
 
     if (isOnline) {
@@ -304,7 +290,7 @@ export default function BuildingForm() {
             full_data: entry.full_data 
           }]);
           if (!error) { 
-            alert("Uploaded Successfully!"); 
+            alert("Survey Packet Uploaded!"); 
             setFormData({}); 
             loadReports(); 
           } else { throw new Error("DB Error"); }
@@ -324,9 +310,9 @@ export default function BuildingForm() {
 
   // --- ADMIN LOGIC ---
   const deleteSelected = async () => {
-    if (!window.confirm(`Purge ${selectedRows.size} records and R2 images?`)) return;
+    const count = selectedRows.size;
+    if (!window.confirm(`Swiss Protocol: Permanently purge ${count} records and their R2 images?`)) return;
     
-    // 1. Gather R2 Keys
     const filesToPurge: string[] = [];
     reports.filter(r => selectedRows.has(r.id)).forEach(report => {
       Object.values(report.full_data).forEach(val => {
@@ -336,7 +322,6 @@ export default function BuildingForm() {
       });
     });
 
-    // 2. API Call to Delete
     if (filesToPurge.length > 0) {
       await fetch('/api/delete-file', { method: 'POST', body: JSON.stringify({ keys: filesToPurge }) });
     }
@@ -344,6 +329,7 @@ export default function BuildingForm() {
     await supabase.from('building_reports').delete().in('id', Array.from(selectedRows));
     setSelectedRows(new Set()); 
     loadReports();
+    alert("System Cleaned.");
   };
 
   const saveEditedReport = async () => {
@@ -380,7 +366,7 @@ export default function BuildingForm() {
     await supabase.from('survey_schema').update({ fields: updated }).filter('id', 'neq', '00000000-0000-0000-0000-000000000000');
   };
 
-  // --- EXCEL EXPORT ---
+  // --- EXCEL EXPORT (Fixed Corruption Issue) ---
   const exportToExcel = async (subset?: BuildingReport[]) => {
     const dataToExport = subset || reports;
     if (dataToExport.length === 0) return alert("No data.");
@@ -388,7 +374,6 @@ export default function BuildingForm() {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Data');
     
-    // Dynamic Columns
     const textHeaders = new Set<string>();
     const imageFields = new Map<string, number>();
 
@@ -422,7 +407,6 @@ export default function BuildingForm() {
       worksheet.addRow(row);
     });
 
-    // Styles
     worksheet.eachRow((row, i) => {
       row.eachCell(c => {
         c.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -432,11 +416,12 @@ export default function BuildingForm() {
       row.height = 30;
     });
 
+    // FIX: ADDED CORRECT MIME TYPE
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `Report_${Date.now()}.xlsx`);
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    saveAs(blob, `Report_${Date.now()}.xlsx`);
   };
 
-  // --- FILTER & PAGINATION ---
   const filteredReports = reports.filter(r => {
     const searchLower = searchQuery.toLowerCase();
     const matchesID = r.building_id.toLowerCase().includes(searchLower);
@@ -499,16 +484,36 @@ export default function BuildingForm() {
             <div className="overflow-hidden rounded-xl border border-slate-200">
               <table className="w-full text-left text-sm">
                 <thead className="bg-[#001F3F] text-[#39CCCC] text-[10px] uppercase font-black">
-                  <tr><th className="p-3 w-10">Select</th><th className="p-3">ID</th><th className="p-3">Action</th></tr>
+                  <tr>
+                    <th className="p-3 w-10">Select</th>
+                    <th className="p-3">ID</th>
+                    <th className="p-3">Region</th>
+                    <th className="p-3">Evidence</th>
+                    <th className="p-3">Action</th>
+                  </tr>
                 </thead>
                 <tbody>
-                  {paginatedReports.map(r => (
-                    <tr key={r.id} className="border-b last:border-0 hover:bg-slate-50">
-                      <td className="p-3"><input type="checkbox" className="accent-[#85144B]" checked={selectedRows.has(r.id)} onChange={() => { const n = new Set(selectedRows); n.has(r.id) ? n.delete(r.id) : n.add(r.id); setSelectedRows(n); }} /></td>
-                      <td className="p-3 font-bold">{r.building_id}</td>
-                      <td className="p-3"><button onClick={() => setEditingReport(r)} className="text-[#001F3F]"><Edit3 size={16} /></button></td>
-                    </tr>
-                  ))}
+                  {paginatedReports.map(r => {
+                    // Find if there are images
+                    const hasPhotos = Object.values(r.full_data).some(v => Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].url);
+                    const photos = hasPhotos ? Object.values(r.full_data).flatMap(v => (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].url) ? v : []) as ImageObject[] : null;
+
+                    return (
+                      <tr key={r.id} className="border-b last:border-0 hover:bg-slate-50">
+                        <td className="p-3"><input type="checkbox" className="accent-[#85144B]" checked={selectedRows.has(r.id)} onChange={() => { const n = new Set(selectedRows); n.has(r.id) ? n.delete(r.id) : n.add(r.id); setSelectedRows(n); }} /></td>
+                        <td className="p-3 font-bold">{r.building_id}</td>
+                        <td className="p-3 text-xs text-slate-500 uppercase">{r.full_data['District'] || '-'}</td>
+                        <td className="p-3">
+                          {photos && photos.length > 0 ? (
+                            <button onClick={() => setViewingImages(photos)} className="flex items-center gap-1 text-[#001F3F] font-bold text-xs hover:underline">
+                              <Eye size={14} /> {photos.length}
+                            </button>
+                          ) : <span className="text-slate-300 text-xs">None</span>}
+                        </td>
+                        <td className="p-3"><button onClick={() => setEditingReport(r)} className="text-[#001F3F] hover:bg-slate-200 p-1 rounded"><Edit3 size={16} /></button></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               <div className="bg-slate-100 p-2 flex justify-between items-center text-[10px] font-bold text-slate-500">
@@ -597,6 +602,21 @@ export default function BuildingForm() {
               </div>
             ))}
             <button onClick={saveEditedReport} className="w-full bg-[#001F3F] text-[#39CCCC] py-4 rounded-xl font-black uppercase text-sm">Update Data</button>
+          </div>
+        </div>
+      )}
+
+      {/* 8. IMAGE VIEWER MODAL */}
+      {viewingImages && (
+        <div className="fixed inset-0 z-[150] bg-black/90 backdrop-blur-lg flex items-center justify-center p-4">
+          <button onClick={() => setViewingImages(null)} className="absolute top-4 right-4 text-white bg-white/20 p-2 rounded-full"><X /></button>
+          <div className="max-w-4xl w-full grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[80vh] overflow-y-auto">
+            {viewingImages.map((img, i) => (
+              <div key={i} className="space-y-2">
+                <img src={img.url} className="w-full rounded-xl shadow-2xl border-2 border-[#39CCCC]" alt="Proof" />
+                <p className="text-center text-[#39CCCC] font-bold text-xs uppercase bg-black/50 p-2 rounded-lg">{img.label}</p>
+              </div>
+            ))}
           </div>
         </div>
       )}
