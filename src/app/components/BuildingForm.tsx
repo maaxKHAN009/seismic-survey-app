@@ -57,7 +57,7 @@ interface BuildingReport {
   full_data: Record<string, any>; 
 }
 
-// --- CONSTANTS: SWISS PROFORMA DEFAULTS ---
+// --- CONSTANTS: SWISS Form DEFAULTS ---
 const DEFAULT_SECTIONS: Section[] = [
   {
     id: 'sec_ident', title: '1. Identification & Location',
@@ -522,7 +522,7 @@ export default function BuildingForm() {
       {/* Header Rebranding */}
       <div className="text-center space-y-1">
          <h1 className="text-2xl md:text-3xl font-black text-[#001F3F] tracking-tighter">UET x EPFL</h1>
-         <p className="text-black font-bold text-[#85144B] uppercase tracking-[0.2em]">Building Inventory Proforma</p>
+         <p className="text-black font-bold text-[#85144B] uppercase tracking-[0.2em]">Building Inventory Form</p>
       </div>
 
       {/* 1. Status Bar */}
@@ -588,13 +588,13 @@ export default function BuildingForm() {
 
           {/* PROTOCOL EDITOR (Sectioned) */}
           <div className="bg-[#001F3F] p-6 rounded-3xl text-white space-y-6 shadow-lg">
-            <h3 className="text-black font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">1. Create Section</h3>
+            <h3 className="text-white font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">1. Create Section</h3>
             <div className="flex gap-2">
-                <input type="text" placeholder="Section Name (e.g. Wall System)" className="flex-1 p-3 bg-white/10 rounded-xl text-black font-bold border border-white/10 text-white" value={newSectionTitle} onChange={(e) => setNewSectionTitle(e.target.value)} />
+                <input type="text" placeholder="Section Name (e.g. Wall System)" className="flex-1 p-3 bg-white/10 rounded-xl text-slate-900 font-bold border border-white/10 text-white" value={newSectionTitle} onChange={(e) => setNewSectionTitle(e.target.value)} />
                 <button onClick={addSection} className="bg-[#39CCCC] text-[#001F3F] px-4 rounded-xl font-black text-black">ADD</button>
             </div>
 
-            <h3 className="text-black font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">2. Add Field to Section</h3>
+            <h3 className="text-white font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">2. Add Field to Section</h3>
             <div className="space-y-3">
                 <select className="w-full p-3 bg-white rounded-xl text-black font-bold border border-white/10 text-black" value={targetSectionId} onChange={(e) => setTargetSectionId(e.target.value)}>
                     <option value="">Select Target Section...</option>
@@ -602,7 +602,7 @@ export default function BuildingForm() {
                 </select>
 
                 <div className="grid grid-cols-2 gap-3">
-                    <input type="text" placeholder="Field Label" className="p-3 bg-white/10 rounded-xl text-black font-bold border border-black/10 text-black" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
+                    <input type="text" placeholder="Field Label" className="p-3 bg-white/10 rounded-xl text-white font-bold border border-black/10 text-black" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
                     <select className="p-3 bg-white rounded-xl text-black font-bold border border-white/10 text-black" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
                         <option value="text">Text</option><option value="number">Number</option><option value="select">Dropdown</option><option value="checkbox">Check</option><option value="image">Photo</option><option value="gps">GPS</option>
                     </select>
@@ -695,7 +695,7 @@ export default function BuildingForm() {
 
       {!isAdmin && (
         <button onClick={submitReport} className="w-full bg-[#85144B] text-[#FFFFFF] font-black py-5 rounded-[2rem] shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-black sticky bottom-4 z-10 border-4 border-white ring-2 ring-slate-100">
-          <CheckSquare size={18} /> {isOnline ? 'SUBMIT PROFORMA' : 'SAVE LOCALLY'}
+          <CheckSquare size={18} /> {isOnline ? 'SUBMIT Form' : 'SAVE LOCALLY'}
         </button>
       )}
 
