@@ -13,7 +13,7 @@ import {
   Info, Database, Settings, PlusCircle, Trash2, 
   X, CheckSquare, Camera, ChevronRight, FileDown, 
   Filter, Square, CheckSquare as CheckIcon, Search, Eye, Tag, Wifi, WifiOff, RefreshCcw, 
-  LayoutGrid, ListFilter, Edit3, ArrowLeft, ArrowRight, AlertTriangle, Layers, MapPin, ClipboardList, Loader2
+  LayoutGrid, ListFilter, Edit3, ArrowLeft, ArrowRight, AlertTriangle, Layers, MapPin, ClipboardList, Loader2, PenTool
 } from 'lucide-react';
 
 // --- Offline Database Schema (Dexie) ---
@@ -370,6 +370,14 @@ export default function BuildingForm() {
     await updateSchema(updated);
     setNewSectionTitle(''); setTargetSectionId(newSection.id);
   };
+  
+  // NEW: Rename Section
+  const renameSection = async (sectionId: string) => {
+      const newTitle = prompt("Enter new section name:");
+      if (!newTitle) return;
+      const updated = sections.map(s => s.id === sectionId ? { ...s, title: newTitle } : s);
+      await updateSchema(updated);
+  };
 
   const addField = async () => {
     if (!newFieldLabel || !targetSectionId) return alert("Label/Section missing.");
@@ -419,6 +427,29 @@ export default function BuildingForm() {
     await supabase.from('building_reports').delete().in('id', Array.from(selectedRows));
     setSelectedRows(new Set()); loadReports();
     alert("System Cleaned.");
+  };
+
+  // --- EDIT REPORT LOGIC (Super Admin) ---
+  const saveEditedReport = async () => {
+    if (!editingReport) return;
+    const { error } = await supabase.from('building_reports').update({ 
+      full_data: editingReport.full_data,
+      building_id: editingReport.full_data['Building ID'] || editingReport.building_id
+    }).eq('id', editingReport.id);
+
+    if (!error) {
+      alert("Changes Saved.");
+      setEditingReport(null);
+      loadReports();
+    }
+  };
+  
+  const handleEditChange = (fieldLabel: string, value: any) => {
+      if (!editingReport) return;
+      setEditingReport({
+          ...editingReport,
+          full_data: { ...editingReport.full_data, [fieldLabel]: value }
+      });
   };
 
   // --- EXCEL EXPORT (FLATTENED) ---
@@ -522,7 +553,7 @@ export default function BuildingForm() {
       {/* 3. Auth */}
       {showAdminPanel && !isAdmin && (
         <div className="bg-slate-100 p-6 rounded-2xl border-2 border-dashed border-slate-300 max-w-sm mx-auto text-center">
-          <input type="password" placeholder="Passcode" className="w-full p-3 rounded-xl border text-center font-bold text-lg mb-3" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input type="password" placeholder="Passcode" className="w-full p-3 rounded-xl border text-center font-bold text-lg mb-3 text-black" value={password} onChange={(e) => setPassword(e.target.value)} />
           <button onClick={() => password === 'swiss2026' ? (setIsAdmin(true), setShowAdminPanel(false), setPassword('')) : alert('Denied')} className="w-full bg-[#001F3F] text-[#39CCCC] p-3 rounded-xl font-black text-xs uppercase">Login</button>
         </div>
       )}
@@ -547,6 +578,7 @@ export default function BuildingForm() {
                          <span className="font-bold">{r.building_id}</span>
                          <div className="flex gap-2">
                              <button onClick={() => setViewingImages(Object.values(r.full_data).flatMap(v => (Array.isArray(v) && v[0]?.url) ? v : []))} className="text-[#001F3F]"><Eye size={14}/></button>
+                             <button onClick={() => setEditingReport(r)} className="text-[#001F3F]"><Edit3 size={14}/></button>
                              <input type="checkbox" checked={selectedRows.has(r.id)} onChange={() => { const n = new Set(selectedRows); n.has(r.id) ? n.delete(r.id) : n.add(r.id); setSelectedRows(n); }} />
                          </div>
                      </div>
@@ -564,14 +596,14 @@ export default function BuildingForm() {
 
             <h3 className="text-xs font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">2. Add Field to Section</h3>
             <div className="space-y-3">
-                <select className="w-full p-3 bg-white/10 rounded-xl text-xs font-bold border border-white/10 text-white" value={targetSectionId} onChange={(e) => setTargetSectionId(e.target.value)}>
+                <select className="w-full p-3 bg-white rounded-xl text-xs font-bold border border-white/10 text-black" value={targetSectionId} onChange={(e) => setTargetSectionId(e.target.value)}>
                     <option value="">Select Target Section...</option>
                     {sections.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                 </select>
 
                 <div className="grid grid-cols-2 gap-3">
                     <input type="text" placeholder="Field Label" className="p-3 bg-white/10 rounded-xl text-xs font-bold border border-white/10 text-white" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
-                    <select className="p-3 bg-white/10 rounded-xl text-xs font-bold border border-white/10 text-white" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
+                    <select className="p-3 bg-white rounded-xl text-xs font-bold border border-white/10 text-black" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
                         <option value="text">Text</option><option value="number">Number</option><option value="select">Dropdown</option><option value="checkbox">Check</option><option value="image">Photo</option><option value="gps">GPS</option>
                     </select>
                 </div>
@@ -593,7 +625,12 @@ export default function BuildingForm() {
                 <div className="flex items-center gap-3 border-b-4 border-[#001F3F] pb-2">
                     <Layers className="text-[#001F3F]" size={20} />
                     <h2 className="text-sm font-black text-[#001F3F] uppercase tracking-widest">{section.title}</h2>
-                    {isAdmin && <button onClick={() => removeSection(section.id)} className="ml-auto text-red-400 hover:text-red-600"><Trash2 size={16}/></button>}
+                    {isAdmin && (
+                        <div className="ml-auto flex gap-2">
+                            <button onClick={() => renameSection(section.id)} className="text-blue-500 hover:text-blue-700"><PenTool size={16}/></button>
+                            <button onClick={() => removeSection(section.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
@@ -669,6 +706,56 @@ export default function BuildingForm() {
             <div className="grid grid-cols-2 gap-4 max-h-[80vh] overflow-y-auto">
                 {viewingImages.map((img, i) => <img key={i} src={img.url} className="w-full rounded border-2 border-[#39CCCC]" />)}
             </div>
+        </div>
+      )}
+
+      {/* 7. SUPER ADMIN EDIT MODAL */}
+      {editingReport && (
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b pb-2">
+              <h3 className="font-black text-lg text-[#001F3F]">FULL DATA EDITOR</h3>
+              <button onClick={() => setEditingReport(null)}><X /></button>
+            </div>
+            
+            {/* Iterate Sections -> Fields */}
+            {sections.map(sec => (
+              <div key={sec.id} className="space-y-3 border-b pb-4">
+                <h4 className="text-xs font-black text-[#85144B] uppercase tracking-widest">{sec.title}</h4>
+                {sec.fields.map(f => (
+                  <div key={f.id} className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-slate-400">{f.label}</label>
+                    
+                    {f.type === 'text' && <input type="text" className="w-full p-3 bg-slate-50 rounded-xl font-bold border" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
+                    
+                    {f.type === 'number' && <input type="number" className="w-full p-3 bg-slate-50 rounded-xl font-bold border" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
+                    
+                    {f.type === 'select' && (
+                       <select className="w-full p-3 bg-slate-50 rounded-xl font-bold border" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)}>
+                          <option value="">Select...</option>
+                          {f.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                       </select>
+                    )}
+
+                    {f.type === 'checkbox' && (
+                       <div className="flex items-center gap-2">
+                         <input type="checkbox" className="w-5 h-5 accent-[#85144B]" checked={!!editingReport.full_data[f.label]} onChange={(e) => handleEditChange(f.label, e.target.checked)} />
+                         <span className="text-xs font-bold">Verified</span>
+                       </div>
+                    )}
+
+                    {f.type === 'image' && (
+                       <ImageUpload label={f.label} value={editingReport.full_data[f.label] || []} onChange={(imgs) => handleEditChange(f.label, imgs)} />
+                    )}
+
+                    {f.type === 'gps' && <input type="text" className="w-full p-3 bg-slate-100 font-mono text-xs border" value={editingReport.full_data[f.label] || ''} readOnly />}
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            <button onClick={saveEditedReport} className="w-full bg-[#001F3F] text-[#39CCCC] py-4 rounded-xl font-black uppercase text-sm sticky bottom-0 shadow-xl">SAVE ALL CHANGES</button>
+          </div>
         </div>
       )}
 
