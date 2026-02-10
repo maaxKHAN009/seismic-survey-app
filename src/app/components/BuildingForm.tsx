@@ -545,7 +545,7 @@ export default function BuildingForm() {
         {!isAdmin && <button onClick={() => exportToExcel()} className="text-[10px] font-black bg-white px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-[#001F3F] hover:text-[#39CCCC] transition-colors flex items-center gap-2">
           <FileDown size={14} /> EXCEL
         </button>}
-        <button onClick={() => isAdmin ? setIsAdmin(false) : setShowAdminPanel(!showAdminPanel)} className="text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-wider">
+        <button onClick={() => isAdmin ? setIsAdmin(false) : setShowAdminPanel(!showAdminPanel)} className="text-[10px] font-black text-slate-900 hover:text-blue-600 uppercase tracking-wider">
           {isAdmin ? 'Exit Admin' : 'Admin'}
         </button>
       </div>
@@ -570,7 +570,7 @@ export default function BuildingForm() {
                      <button onClick={deleteSelected} className="bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded">PURGE ({selectedRows.size})</button>
                  </div>
              </div>
-             <input type="text" placeholder="Search..." className="w-full p-2 bg-slate-50 border rounded-lg text-xs" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+             <input type="text" placeholder="Search..." className="w-full p-2 bg-slate-50 border rounded-lg text-black" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
              
              <div className="max-h-60 overflow-y-auto">
                  {paginatedReports.map(r => (
@@ -602,7 +602,7 @@ export default function BuildingForm() {
                 </select>
 
                 <div className="grid grid-cols-2 gap-3">
-                    <input type="text" placeholder="Field Label" className="p-3 bg-white/10 rounded-xl text-xs font-bold border border-white/10 text-white" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
+                    <input type="text" placeholder="Field Label" className="p-3 bg-white/10 rounded-xl text-xs font-bold border border-black/10 text-black" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
                     <select className="p-3 bg-white rounded-xl text-xs font-bold border border-white/10 text-black" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
                         <option value="text">Text</option><option value="number">Number</option><option value="select">Dropdown</option><option value="checkbox">Check</option><option value="image">Photo</option><option value="gps">GPS</option>
                     </select>
@@ -687,7 +687,7 @@ export default function BuildingForm() {
                             )}
                         </div>
                     ))}
-                    {section.fields.length === 0 && <p className="text-xs text-slate-400 italic text-center py-4">No fields in this section yet.</p>}
+                    {section.fields.length === 0 && <p className="text-xs text-slate-900 italic text-center py-4">No fields in this section yet.</p>}
                 </div>
             </div>
         ))}
