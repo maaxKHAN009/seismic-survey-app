@@ -596,14 +596,14 @@ export default function BuildingForm() {
 
             <h3 className="text-white font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">2. Add Field to Section</h3>
             <div className="space-y-3">
-                <select className="w-full p-3 bg-white/10 rounded-xl text-black font-bold border border-white/10 text-black" value={targetSectionId} onChange={(e) => setTargetSectionId(e.target.value)}>
+                <select className="w-full p-3 bg-white/10 rounded-xl text-black font-bold border border-white/10 text-slate-900" value={targetSectionId} onChange={(e) => setTargetSectionId(e.target.value)}>
                     <option value="">Select Target Section...</option>
                     {sections.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                 </select>
 
                 <div className="grid grid-cols-2 gap-3">
                     <input type="text" placeholder="Field Label" className="p-3 bg-white/10 rounded-xl text-white font-bold border border-black/10 text-black" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
-                    <select className="p-3 bg-white/10 rounded-xl text-black font-bold border border-white/10 text-black" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
+                    <select className="p-3 bg-white/10 rounded-xl text-black font-bold border border-white/10 text-slate-900" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
                         <option value="text">Text</option><option value="number">Number</option><option value="select">Dropdown</option><option value="checkbox">Check</option><option value="image">Photo</option><option value="gps">GPS</option>
                     </select>
                 </div>
