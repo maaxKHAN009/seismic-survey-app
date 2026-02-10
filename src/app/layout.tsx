@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Seismic Survey Portal",
-  description: "Swiss-Funded Structural Assessment Tool",
+  title: "Survey Portal",
+  description: "Structural Assessment Tool",
   manifest: "/manifest.json", // <--- THIS LINE IS CRITICAL
   themeColor: "#85144B",
   viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",

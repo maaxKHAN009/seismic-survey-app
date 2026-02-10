@@ -724,7 +724,7 @@ export default function BuildingForm() {
                 <h4 className="text-xs font-black text-[#85144B] uppercase tracking-widest">{sec.title}</h4>
                 {sec.fields.map(f => (
                   <div key={f.id} className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase text-slate-400">{f.label}</label>
+                    <label className="text-[10px] font-bold uppercase text-black">{f.label}</label>
                     
                     {f.type === 'text' && <input type="text" className="w-full p-3 bg-slate-50 rounded-xl font-bold border" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
                     

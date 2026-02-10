@@ -7,10 +7,10 @@ export default function Home() {
         {/* Professional Header Section */}
         <div className="mb-10 text-center">
           <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase sm:text-4xl">
-            Seismic Vulnerability Assessment
+            Building Assessment Portal
           </h1>
           <p className="mt-2 text-sm font-bold text-blue-600 uppercase tracking-widest">
-            Swiss-Funded Research Project | Pakistan 2026
+            Research Project | Pakistan 2026
           </p>
         </div>
 
