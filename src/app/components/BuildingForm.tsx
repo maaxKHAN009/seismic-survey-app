@@ -13,10 +13,10 @@ import {
   Info, Database, Settings, PlusCircle, Trash2, 
   X, CheckSquare, Camera, ChevronRight, FileDown, 
   Filter, Square, CheckSquare as CheckIcon, Search, Eye, Tag, Wifi, WifiOff, RefreshCcw, 
-  LayoutGrid, ListFilter, Edit3, ArrowLeft, ArrowRight, Layers, MapPin, Loader2, PenTool, Grip
+  LayoutGrid, ListFilter, Edit3, ArrowLeft, ArrowRight, AlertTriangle, Layers, MapPin, Loader2, PenTool, Grip, ArrowUp, ArrowDown, Plus
 } from 'lucide-react';
 
-// --- Offline Database ---
+// --- Offline Database Schema (Dexie) ---
 class SeismicDB extends Dexie {
   outbox!: Table<{ id?: number; building_id: string; full_data: any; timestamp: number }>;
   constructor() {
@@ -27,14 +27,15 @@ class SeismicDB extends Dexie {
 const localDB = new SeismicDB();
 
 // --- Types ---
-type FieldType = 'text' | 'number' | 'select' | 'checkbox' | 'image' | 'gps' | 'group';
+// NEW: Added 'multi_select' and 'dynamic_series'
+type FieldType = 'text' | 'number' | 'select' | 'checkbox' | 'image' | 'gps' | 'group' | 'multi_select' | 'dynamic_series';
 type SubFieldType = 'text' | 'number' | 'select' | 'checkbox';
 
 interface SubField {
   id: string;
   label: string;
   type: SubFieldType;
-  options?: string[]; // For select types
+  options?: string[];
 }
 
 interface CustomField { 
@@ -42,8 +43,8 @@ interface CustomField {
   label: string; 
   type: FieldType; 
   tooltip: string; 
-  options?: string[]; // For top-level select
-  subFields?: SubField[]; // NEW: For groups
+  options?: string[]; // Used for Select, Multi-Select options
+  subFields?: SubField[]; // For groups
   required?: boolean;
 }
 
@@ -59,6 +60,11 @@ interface ImageObject {
   isLocal?: boolean; 
 }
 
+interface DynamicSeriesItem {
+    label: string;
+    value: string;
+}
+
 interface BuildingReport { 
   id: string; 
   building_id: string; 
@@ -66,51 +72,13 @@ interface BuildingReport {
   full_data: Record<string, any>; 
 }
 
-// --- DEFAULTS WITH NEW SUB-FIELD STRUCTURE ---
+// --- CONSTANTS ---
 const DEFAULT_SECTIONS: Section[] = [
   {
-    id: 'sec_ident', title: '1. Identification & Location',
+    id: 'sec_ident', title: '1. Identification',
     fields: [
-      { id: 'f_id', label: 'Building ID', type: 'text', tooltip: 'Unique Code (e.g. PS-001)', required: true },
+      { id: 'f_id', label: 'Building ID', type: 'text', tooltip: 'Unique Code', required: true },
       { id: 'f_date', label: 'Survey Date', type: 'text', tooltip: 'DD/MM/YYYY', required: true },
-      { id: 'f_dist', label: 'District / Tehsil', type: 'text', tooltip: 'Admin Boundary', required: true },
-      { id: 'f_gps', label: 'GPS Coordinates', type: 'gps', tooltip: 'Auto-capture required', required: true },
-      { id: 'f_surv', label: 'Surveyor Name', type: 'text', tooltip: 'Your Name', required: true },
-    ]
-  },
-  {
-    id: 'sec_geom', title: '2. Geometry & Dimensions',
-    fields: [
-      { 
-        id: 'f_dims', label: 'Plan Dimensions', type: 'group', tooltip: 'External measurements', 
-        subFields: [
-            { id: 'sub_len', label: 'Length (ft)', type: 'number' },
-            { id: 'sub_wid', label: 'Width (ft)', type: 'number' }
-        ]
-      },
-      { 
-        id: 'f_hgts', label: 'Story Heights', type: 'group', tooltip: 'Floor to floor', 
-        subFields: [
-            { id: 'sub_g', label: 'Ground Floor (ft)', type: 'number' },
-            { id: 'sub_u', label: 'Upper Floor (ft)', type: 'number' }
-        ]
-      },
-      { id: 'f_area', label: 'Total Built Area', type: 'number', tooltip: 'Square feet', required: false },
-    ]
-  },
-  {
-    id: 'sec_const', title: '3. Construction Typology',
-    fields: [
-      { id: 'f_type', label: 'Construction Type', type: 'select', tooltip: 'Main structural system', options: ['Stone', 'Block', 'Adobe', 'Mixed', 'Other'] },
-      { id: 'f_story', label: 'Number of Stories', type: 'number', tooltip: 'Count G+X', required: true },
-      { id: 'f_shape', label: 'Plan Shape', type: 'select', tooltip: 'Footprint geometry', options: ['Rectangular', 'Square', 'L-shaped', 'Irregular'] },
-    ]
-  },
-  {
-    id: 'sec_doc', title: '4. Documentation',
-    fields: [
-      { id: 'f_elev', label: 'Elevation Photos', type: 'image', tooltip: 'Front and Side views' },
-      { id: 'f_dmgs', label: 'Damage Details', type: 'image', tooltip: 'Close-ups of cracks/failures' },
     ]
   }
 ];
@@ -205,6 +173,56 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
   );
 };
 
+// --- NEW: Multi-Select Component ---
+const MultiSelect = ({ options, value, onChange }: { options: string[], value: string[], onChange: (val: string[]) => void }) => {
+    const toggle = (opt: string) => {
+        if (value.includes(opt)) onChange(value.filter(v => v !== opt));
+        else onChange([...value, opt]);
+    };
+    return (
+        <div className="grid grid-cols-2 gap-2">
+            {options.map(opt => (
+                <button key={opt} onClick={() => toggle(opt)} 
+                    className={`p-3 text-left rounded-lg text-xs font-bold border-2 transition-all flex items-center justify-between ${value.includes(opt) ? 'bg-[#001F3F] text-white border-[#001F3F]' : 'bg-white text-black border-[#AAAAAA]'}`}>
+                    {opt}
+                    {value.includes(opt) && <CheckSquare size={14} className="text-[#39CCCC]" />}
+                </button>
+            ))}
+        </div>
+    );
+};
+
+// --- NEW: Dynamic Series Component (Surveyor Defined Rows) ---
+const DynamicSeries = ({ value, onChange }: { value: DynamicSeriesItem[], onChange: (val: DynamicSeriesItem[]) => void }) => {
+    const addRow = () => {
+        const nextIdx = value.length + 1;
+        onChange([...value, { label: `Story ${nextIdx}`, value: '' }]);
+    };
+    
+    const updateRow = (index: number, field: 'label' | 'value', val: string) => {
+        const updated = [...value];
+        updated[index] = { ...updated[index], [field]: val };
+        onChange(updated);
+    };
+
+    return (
+        <div className="space-y-2">
+            {value.map((item, idx) => (
+                <div key={idx} className="flex gap-2">
+                    <input type="text" className="w-1/2 p-2 bg-[#F5F5F5] rounded border font-bold text-xs" 
+                        value={item.label} onChange={(e) => updateRow(idx, 'label', e.target.value)} placeholder="Label (e.g. Story 1)" />
+                    <input type="number" className="w-1/2 p-2 bg-white rounded border font-bold text-xs text-black" 
+                        value={item.value} onChange={(e) => updateRow(idx, 'value', e.target.value)} placeholder="Value" />
+                    <button onClick={() => onChange(value.filter((_, i) => i !== idx))} className="text-red-500"><Trash2 size={16}/></button>
+                </div>
+            ))}
+            <button onClick={addRow} className="w-full py-2 bg-[#DDDDDD] rounded-lg text-xs font-black text-[#111111] hover:bg-[#CCCCCC] flex items-center justify-center gap-2">
+                <Plus size={14} /> ADD ROW
+            </button>
+        </div>
+    );
+};
+
 // ==========================================
 // 3. MAIN COMPONENT LOGIC
 // ==========================================
@@ -231,7 +249,7 @@ export default function BuildingForm() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
 
-  // Schema Editor State
+  // Schema Editor
   const [newSectionTitle, setNewSectionTitle] = useState('');
   const [targetSectionId, setTargetSectionId] = useState('');
   const [newFieldLabel, setNewFieldLabel] = useState('');
@@ -239,14 +257,15 @@ export default function BuildingForm() {
   const [newFieldTooltip, setNewFieldTooltip] = useState('');
   const [newOptions, setNewOptions] = useState<string[]>(['']);
   
-  // NEW: Sub-Field Builder State
+  // Sub-Field Builder
   const [tempSubFields, setTempSubFields] = useState<SubField[]>([]);
   const [newSubLabel, setNewSubLabel] = useState('');
   const [newSubType, setNewSubType] = useState<SubFieldType>('text');
   const [newSubOptions, setNewSubOptions] = useState<string[]>(['']);
 
   useEffect(() => {
-    loadSchema(); loadReports();
+    loadSchema();
+    loadReports();
     const update = () => setIsOnline(navigator.onLine);
     window.addEventListener('online', update); window.addEventListener('offline', update);
     checkPending();
@@ -257,13 +276,8 @@ export default function BuildingForm() {
   
   const loadSchema = async () => { 
     const { data } = await supabase.from('survey_schema').select('fields').limit(1).single(); 
-    if(data && data.fields && Array.isArray(data.fields) && data.fields[0].fields) {
-         setSections(data.fields);
-         if (data.fields.length > 0) setTargetSectionId(data.fields[0].id);
-    } else {
-        setSections(DEFAULT_SECTIONS);
-        setTargetSectionId(DEFAULT_SECTIONS[0].id);
-    }
+    if(data && data.fields) { setSections(data.fields); if (data.fields.length > 0) setTargetSectionId(data.fields[0].id); } 
+    else { setSections(DEFAULT_SECTIONS); setTargetSectionId(DEFAULT_SECTIONS[0].id); }
   };
   
   const loadReports = async () => { 
@@ -279,7 +293,26 @@ export default function BuildingForm() {
       const pending = await localDB.outbox.toArray();
       for (const report of pending) {
         const processedData = JSON.parse(JSON.stringify(report.full_data));
-        // Image Processing Logic omitted for brevity (same as previous)
+        // Image Processing...
+        for (const key in processedData) {
+            const val = processedData[key];
+            if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && val[0].isLocal) {
+                const uploadedImages: ImageObject[] = [];
+                for (const img of val) {
+                    if (img.isLocal) {
+                        const res = await fetch(img.url);
+                        const blob = await res.blob();
+                        const file = new File([blob], `offline-${Date.now()}.jpg`, { type: "image/jpeg" });
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+                        const uploadData = await uploadRes.json();
+                        if (uploadData.url) uploadedImages.push({ url: uploadData.url, label: img.label, isLocal: false });
+                    } else { uploadedImages.push(img); }
+                }
+                processedData[key] = uploadedImages;
+            }
+        }
         const { error } = await supabase.from('building_reports').insert([{ building_id: report.building_id, full_data: processedData, created_at: new Date(report.timestamp).toISOString() }]);
         if (!error) await localDB.outbox.delete(report.id!);
       }
@@ -290,25 +323,36 @@ export default function BuildingForm() {
   const submitReport = async () => {
     if (!formData['Building ID']) return alert("Critical: Building ID Required.");
     const entry = { building_id: formData['Building ID'], full_data: formData, timestamp: Date.now() };
-
     if (isOnline) {
       try {
           const { error } = await supabase.from('building_reports').insert([{ building_id: entry.building_id, full_data: entry.full_data }]);
-          if (!error) { alert("Packet Uploaded!"); setFormData({}); loadReports(); } 
-          else { throw new Error("DB Error"); }
+          if (!error) { alert("Packet Uploaded!"); setFormData({}); loadReports(); } else { throw new Error("DB Error"); }
       } catch (e) { await localDB.outbox.add(entry); await checkPending(); alert("Connection unstable. Saved Locally."); setFormData({}); }
     } else {
       await localDB.outbox.add(entry); await checkPending(); alert("Offline Mode: Saved to Vault."); setFormData({});
     }
   };
 
-  // --- ADMIN & SCHEMA ---
+  const captureGPS = (fieldId: string) => {
+      setLocating(true);
+      if ("geolocation" in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+              setFormData(prev => ({ ...prev, [fieldId]: coords })); setLocating(false); alert(`Location Locked!\nAccuracy: ±${Math.round(pos.coords.accuracy)}m`);
+            }, 
+            (err) => { setLocating(false); alert("GPS Error: " + err.message); },
+            { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+          );
+      } else { setLocating(false); alert("GPS not found."); }
+  }
+
+  // --- ADMIN: SCHEMA MANAGEMENT & REORDERING ---
   const addSection = async () => {
     if (!newSectionTitle) return;
     const newSection: Section = { id: Date.now().toString(), title: newSectionTitle, fields: [] };
     const updated = [...sections, newSection];
-    await updateSchema(updated);
-    setNewSectionTitle(''); setTargetSectionId(newSection.id);
+    await updateSchema(updated); setNewSectionTitle(''); setTargetSectionId(newSection.id);
   };
   
   const renameSection = async (sectionId: string) => {
@@ -318,7 +362,16 @@ export default function BuildingForm() {
       await updateSchema(updated);
   };
 
-  // NEW: Add Sub-Field to Local State
+  const moveSection = async (index: number, direction: 'up' | 'down') => {
+      const newSections = [...sections];
+      if (direction === 'up' && index > 0) {
+          [newSections[index], newSections[index - 1]] = [newSections[index - 1], newSections[index]];
+      } else if (direction === 'down' && index < newSections.length - 1) {
+          [newSections[index], newSections[index + 1]] = [newSections[index + 1], newSections[index]];
+      }
+      await updateSchema(newSections);
+  };
+
   const pushSubField = () => {
       if(!newSubLabel) return;
       const newSub: SubField = {
@@ -327,8 +380,7 @@ export default function BuildingForm() {
           type: newSubType,
           options: newSubType === 'select' ? newSubOptions.filter(o => o.trim() !== '') : undefined
       };
-      setTempSubFields([...tempSubFields, newSub]);
-      setNewSubLabel(''); setNewSubOptions(['']);
+      setTempSubFields([...tempSubFields, newSub]); setNewSubLabel(''); setNewSubOptions(['']);
   };
 
   const addField = async () => {
@@ -336,7 +388,7 @@ export default function BuildingForm() {
     const newField: CustomField = {
       id: Date.now().toString(), label: newFieldLabel, type: newFieldType,
       tooltip: newFieldTooltip || 'Observation required.',
-      options: newFieldType === 'select' ? newOptions.filter(o => o.trim() !== '') : undefined,
+      options: (newFieldType === 'select' || newFieldType === 'multi_select') ? newOptions.filter(o => o.trim() !== '') : undefined,
       subFields: newFieldType === 'group' ? tempSubFields : undefined
     };
     const updatedSections = sections.map(sec => sec.id === targetSectionId ? { ...sec, fields: [...sec.fields, newField] } : sec);
@@ -350,11 +402,26 @@ export default function BuildingForm() {
     await updateSchema(updatedSections);
   };
 
+  const moveField = async (sectionId: string, fieldIndex: number, direction: 'up' | 'down') => {
+      const updatedSections = sections.map(sec => {
+          if (sec.id === sectionId) {
+              const newFields = [...sec.fields];
+              if (direction === 'up' && fieldIndex > 0) {
+                  [newFields[fieldIndex], newFields[fieldIndex - 1]] = [newFields[fieldIndex - 1], newFields[fieldIndex]];
+              } else if (direction === 'down' && fieldIndex < newFields.length - 1) {
+                  [newFields[fieldIndex], newFields[fieldIndex + 1]] = [newFields[fieldIndex + 1], newFields[fieldIndex]];
+              }
+              return { ...sec, fields: newFields };
+          }
+          return sec;
+      });
+      await updateSchema(updatedSections);
+  };
+
   const removeSection = async (sectionId: string) => {
       if(!window.confirm("Delete section and fields?")) return;
       const updated = sections.filter(s => s.id !== sectionId);
-      await updateSchema(updated);
-      if(updated.length > 0) setTargetSectionId(updated[0].id);
+      await updateSchema(updated); if(updated.length > 0) setTargetSectionId(updated[0].id);
   }
 
   const updateSchema = async (newSections: Section[]) => {
@@ -378,7 +445,6 @@ export default function BuildingForm() {
     alert("System Cleaned.");
   };
 
-  // --- EDITING ---
   const saveEditedReport = async () => {
     if (!editingReport) return;
     const { error } = await supabase.from('building_reports').update({ 
@@ -393,34 +459,62 @@ export default function BuildingForm() {
       setEditingReport({ ...editingReport, full_data: { ...editingReport.full_data, [fieldLabel]: value } });
   };
 
-  // --- EXCEL ---
+  // --- EXCEL EXPORT (SMART FLATTENING) ---
   const exportToExcel = async (subset?: BuildingReport[]) => {
     const dataToExport = subset || reports;
     if (dataToExport.length === 0) return alert("No data.");
+
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Data');
     
     const textHeaders = new Set<string>();
     const imageFields = new Map<string, number>();
+    const dynamicSeriesFields = new Set<string>();
 
     dataToExport.forEach(r => {
       Object.entries(r.full_data).forEach(([k, v]) => {
         if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].url) {
           imageFields.set(k, Math.max(imageFields.get(k) || 0, v.length));
-        } else textHeaders.add(k);
+        } else if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].label && v[0].value !== undefined) {
+             // Detect Dynamic Series (e.g. Story Heights)
+             // We need to find all unique labels used (Story 1, Story 2, etc.)
+             v.forEach((item: DynamicSeriesItem) => dynamicSeriesFields.add(`${k} [${item.label}]`));
+        } else {
+          textHeaders.add(k);
+        }
       });
     });
 
     const columns: any[] = [{ header: 'DATE', key: 'date', width: 15 }, { header: 'ID', key: 'id', width: 20 }];
     textHeaders.forEach(h => columns.push({ header: h.toUpperCase(), key: h, width: 25 }));
+    // Add Dynamic Series Columns
+    Array.from(dynamicSeriesFields).sort().forEach(h => columns.push({ header: h.toUpperCase(), key: h, width: 20 }));
+
     imageFields.forEach((max, label) => {
       for (let i = 1; i <= max; i++) columns.push({ header: `${label.toUpperCase()} ${i}`, key: `${label}_${i}`, width: 30 });
     });
+
     worksheet.columns = columns;
 
     dataToExport.forEach(r => {
       const row: any = { date: new Date(r.created_at).toLocaleDateString(), id: r.building_id };
-      textHeaders.forEach(h => row[h] = r.full_data[h] ? String(r.full_data[h]) : '');
+      
+      // Standard Fields
+      textHeaders.forEach(h => {
+          const val = r.full_data[h];
+          row[h] = Array.isArray(val) ? val.join(', ') : val ? String(val) : '';
+      });
+
+      // Dynamic Series Flattening
+      Object.entries(r.full_data).forEach(([k, v]) => {
+          if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].label && v[0].value !== undefined) {
+              v.forEach((item: DynamicSeriesItem) => {
+                  row[`${k} [${item.label}]`] = item.value;
+              });
+          }
+      });
+
+      // Images
       imageFields.forEach((max, label) => {
         const photos = r.full_data[label];
         if (Array.isArray(photos)) photos.forEach((p, idx) => {
@@ -430,7 +524,7 @@ export default function BuildingForm() {
       worksheet.addRow(row);
     });
 
-    // Formatting: Center Alignment & Blue Header
+    // Formatting
     worksheet.eachRow((row, i) => {
         row.eachCell(c => {
           c.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -447,23 +541,6 @@ export default function BuildingForm() {
 
   const filteredReports = reports.filter(r => r.building_id.toLowerCase().includes(searchQuery.toLowerCase()));
   const paginatedReports = filteredReports.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
-  // --- GPS ---
-  const captureGPS = (fieldId: string) => {
-      setLocating(true);
-      if ("geolocation" in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
-              setFormData(prev => ({ ...prev, [fieldId]: coords }));
-              setLocating(false);
-              alert(`Location Locked!\nAccuracy: ±${Math.round(pos.coords.accuracy)}m`);
-            }, 
-            (err) => { setLocating(false); alert("GPS Error: " + err.message); },
-            { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
-          );
-      } else { setLocating(false); alert("GPS not found."); }
-  }
 
   return (
     <div className="max-w-screen-lg mx-auto px-4 pb-32 pt-6 space-y-8 min-h-screen bg-[#F5F5F5]">
@@ -508,7 +585,6 @@ export default function BuildingForm() {
                  </div>
              </div>
              <input type="text" placeholder="Search..." className="w-full p-2 bg-slate-50 border rounded-lg text-xs text-black" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-             
              <div className="max-h-60 overflow-y-auto">
                  {paginatedReports.map(r => (
                      <div key={r.id} className="flex justify-between items-center p-3 border-b text-xs">
@@ -540,19 +616,20 @@ export default function BuildingForm() {
                 <div className="grid grid-cols-2 gap-3">
                     <input type="text" placeholder="Field Label" className="p-3 bg-white/10 rounded-xl text-xs font-bold border border-white/10 text-white" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
                     <select className="p-3 bg-white rounded-xl text-xs font-bold border border-white/10 text-black" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
-                        <option value="text">Text</option><option value="number">Number</option><option value="select">Dropdown</option><option value="checkbox">Check</option><option value="image">Photo</option><option value="gps">GPS</option>
-                        <option value="group">Group (Sub-fields)</option>
+                        <option value="text">Text</option><option value="number">Number</option><option value="select">Dropdown</option><option value="multi_select">Multi-Select</option>
+                        <option value="checkbox">Check</option><option value="image">Photo</option><option value="gps">GPS</option>
+                        <option value="group">Group (Sub-fields)</option><option value="dynamic_series">Dynamic Series</option>
                     </select>
                 </div>
 
-                {/* SELECT OPTIONS */}
-                {newFieldType === 'select' && (
+                {/* SELECT / MULTI-SELECT OPTIONS */}
+                {(newFieldType === 'select' || newFieldType === 'multi_select') && (
                   <div className="flex gap-2">
                       <input type="text" placeholder="Options (comma separated)" className="flex-1 p-3 bg-white/10 rounded-xl text-xs text-white" value={newOptions.join(',')} onChange={(e) => setNewOptions(e.target.value.split(','))} />
                   </div>
                 )}
 
-                {/* NEW: SUB-FIELD BUILDER */}
+                {/* GROUP SUB-FIELDS BUILDER */}
                 {newFieldType === 'group' && (
                    <div className="bg-black/20 p-3 rounded-xl space-y-2">
                        <p className="text-[10px] text-[#39CCCC] font-bold">Configure Sub-Fields</p>
@@ -564,19 +641,9 @@ export default function BuildingForm() {
                        </div>
                        {newSubType === 'select' && <input type="text" placeholder="Options (comma sep)" className="w-full p-2 bg-white/10 text-white text-xs rounded" value={newSubOptions.join(',')} onChange={(e) => setNewSubOptions(e.target.value.split(','))} />}
                        <button onClick={pushSubField} className="w-full bg-[#85144B] text-white text-[10px] p-2 rounded font-bold">+ Add Sub-Field</button>
-                       
-                       {/* List Added */}
-                       <div className="space-y-1 mt-2">
-                          {tempSubFields.map(sf => (
-                             <div key={sf.id} className="flex justify-between text-[10px] bg-white/5 p-1 rounded px-2">
-                                <span>{sf.label} ({sf.type})</span>
-                                <button className="text-red-400" onClick={() => setTempSubFields(tempSubFields.filter(t => t.id !== sf.id))}>x</button>
-                             </div>
-                          ))}
-                       </div>
+                       <div className="space-y-1 mt-2">{tempSubFields.map(sf => (<div key={sf.id} className="flex justify-between text-[10px] bg-white/5 p-1 rounded px-2"><span>{sf.label} ({sf.type})</span><button className="text-red-400" onClick={() => setTempSubFields(tempSubFields.filter(t => t.id !== sf.id))}>x</button></div>))}</div>
                    </div>
                 )}
-
                 <button onClick={addField} disabled={!targetSectionId} className="w-full bg-[#39CCCC] text-[#001F3F] p-3 rounded-xl font-black text-xs uppercase tracking-widest mt-2 disabled:opacity-50">DEPLOY FIELD</button>
             </div>
           </div>
@@ -585,13 +652,15 @@ export default function BuildingForm() {
 
       {/* 5. USER FORM RENDERER (SECTIONED) */}
       <div className="space-y-8">
-        {sections.map(section => (
+        {sections.map((section, secIdx) => (
             <div key={section.id} className="space-y-4">
                 <div className="flex items-center gap-3 border-b-4 border-[#001F3F] pb-2">
                     <Layers className="text-[#001F3F]" size={20} />
                     <h2 className="text-sm font-black text-[#001F3F] uppercase tracking-widest">{section.title}</h2>
                     {isAdmin && (
                         <div className="ml-auto flex gap-2">
+                            <button onClick={() => moveSection(secIdx, 'up')} className="text-slate-400 hover:text-blue-500"><ArrowUp size={16}/></button>
+                            <button onClick={() => moveSection(secIdx, 'down')} className="text-slate-400 hover:text-blue-500"><ArrowDown size={16}/></button>
                             <button onClick={() => renameSection(section.id)} className="text-blue-500 hover:text-blue-700"><PenTool size={16}/></button>
                             <button onClick={() => removeSection(section.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
                         </div>
@@ -599,19 +668,26 @@ export default function BuildingForm() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
-                    {section.fields.map(f => (
+                    {section.fields.map((f, fIdx) => (
                         <div key={f.id} className="bg-white p-4 sm:p-6 rounded-2xl border-2 border-slate-100 shadow-sm relative hover:border-blue-200 transition-colors">
                             <div className="flex justify-between items-center mb-2">
                                 <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111] flex items-center gap-1">
                                     {f.label} <Tooltip text={f.tooltip} />
                                     {f.required && <span className="text-red-500">*</span>}
                                 </label>
-                                {isAdmin && <button onClick={() => removeField(section.id, f.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button>}
+                                {isAdmin && (
+                                    <div className="flex gap-2">
+                                        <button onClick={() => moveField(section.id, fIdx, 'up')} className="text-slate-300 hover:text-blue-500"><ArrowUp size={14}/></button>
+                                        <button onClick={() => moveField(section.id, fIdx, 'down')} className="text-slate-300 hover:text-blue-500"><ArrowDown size={14}/></button>
+                                        <button onClick={() => removeField(section.id, f.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button>
+                                    </div>
+                                )}
                             </div>
 
                             {/* DYNAMIC INPUT RENDERING */}
                             {f.type === 'text' && <input type="text" className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" placeholder="..." value={formData[f.label] || ''} onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} />}
                             {f.type === 'number' && <input type="number" className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" placeholder="0" value={formData[f.label] || ''} onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} />}
+                            
                             {f.type === 'select' && (
                                 <div className="relative">
                                     <select className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] appearance-none text-[#111111] outline-none" value={formData[f.label] || ''} onChange={(e) => setFormData({...formData, [f.label]: e.target.value})}>
@@ -622,11 +698,18 @@ export default function BuildingForm() {
                                 </div>
                             )}
 
-                            {/* GROUP SUB-FIELDS RENDERING */}
+                            {f.type === 'multi_select' && (
+                                <MultiSelect options={f.options || []} value={formData[f.label] || []} onChange={(val) => setFormData({...formData, [f.label]: val})} />
+                            )}
+
+                            {f.type === 'dynamic_series' && (
+                                <DynamicSeries value={formData[f.label] || []} onChange={(val) => setFormData({...formData, [f.label]: val})} />
+                            )}
+
                             {f.type === 'group' && f.subFields && (
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                                     {f.subFields.map((sub, idx) => (
-                                        <div key={sub.id}>
+                                        <div key={idx}>
                                             <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">{sub.label}</p>
                                             {sub.type === 'text' && <input type="text" className="w-full p-2 bg-white rounded-lg border border-slate-300 text-xs font-bold text-black" value={formData[`${f.label} [${sub.label}]`] || ''} onChange={(e) => setFormData({...formData, [`${f.label} [${sub.label}]`]: e.target.value})} />}
                                             {sub.type === 'number' && <input type="number" className="w-full p-2 bg-white rounded-lg border border-slate-300 text-xs font-bold text-black" value={formData[`${f.label} [${sub.label}]`] || ''} onChange={(e) => setFormData({...formData, [`${f.label} [${sub.label}]`]: e.target.value})} />}
@@ -645,12 +728,14 @@ export default function BuildingForm() {
                             )}
 
                             {f.type === 'image' && <ImageUpload label={f.label} value={formData[f.label] || []} onChange={(imgs) => setFormData({...formData, [f.label]: imgs})} />}
+                            
                             {f.type === 'gps' && (
                                 <div className="flex gap-2">
                                     <input type="text" readOnly className="flex-1 p-3 bg-slate-100 rounded-xl font-mono text-xs border-2 text-black" value={formData[f.label] || 'Waiting for signal...'} />
                                     <button onClick={() => captureGPS(f.label)} className="bg-[#85144B] text-white p-3 rounded-xl hover:bg-[#600e35] flex items-center justify-center gap-2"><Loader2 className={locating ? "animate-spin" : "hidden"} size={18} /> <MapPin size={18} /></button>
                                 </div>
                             )}
+                            
                             {f.type === 'checkbox' && (
                                 <label className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl border-2 border-transparent hover:border-[#2ECC40] transition-all cursor-pointer">
                                     <input type="checkbox" className="w-6 h-6 accent-[#2ECC40] rounded" checked={!!formData[f.label]} onChange={(e) => setFormData({...formData, [f.label]: e.target.checked})} />
@@ -659,6 +744,7 @@ export default function BuildingForm() {
                             )}
                         </div>
                     ))}
+                    {section.fields.length === 0 && <p className="text-xs text-slate-400 italic text-center py-4">No fields in this section yet.</p>}
                 </div>
             </div>
         ))}
@@ -696,9 +782,20 @@ export default function BuildingForm() {
                 {sec.fields.map(f => (
                   <div key={f.id} className="space-y-1">
                     <label className="text-[10px] font-bold uppercase text-slate-900">{f.label}</label>
-                    {/* Simplified Edit Fields - Expand for all types */}
                     {f.type === 'text' && <input type="text" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
-                    {/* Add edit logic for Group/Select/etc similar to main form */}
+                    {f.type === 'number' && <input type="number" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
+                    {f.type === 'select' && (
+                       <select className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)}>
+                          <option value="">Select...</option>
+                          {f.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                       </select>
+                    )}
+                    {f.type === 'multi_select' && (
+                        <MultiSelect options={f.options || []} value={editingReport.full_data[f.label] || []} onChange={(val) => handleEditChange(f.label, val)} />
+                    )}
+                    {f.type === 'dynamic_series' && (
+                        <DynamicSeries value={editingReport.full_data[f.label] || []} onChange={(val) => handleEditChange(f.label, val)} />
+                    )}
                     {f.type === 'group' && f.subFields && (
                        <div className="grid grid-cols-2 gap-2 bg-slate-100 p-2 rounded">
                           {f.subFields.map(sub => (
@@ -711,6 +808,16 @@ export default function BuildingForm() {
                           ))}
                        </div>
                     )}
+                    {f.type === 'checkbox' && (
+                       <div className="flex items-center gap-2">
+                         <input type="checkbox" className="w-5 h-5 accent-[#85144B]" checked={!!editingReport.full_data[f.label]} onChange={(e) => handleEditChange(f.label, e.target.checked)} />
+                         <span className="text-xs font-bold text-black">Verified</span>
+                       </div>
+                    )}
+                    {f.type === 'image' && (
+                       <ImageUpload label={f.label} value={editingReport.full_data[f.label] || []} onChange={(imgs) => handleEditChange(f.label, imgs)} />
+                    )}
+                    {f.type === 'gps' && <input type="text" className="w-full p-3 bg-slate-100 font-mono text-xs border text-black" value={editingReport.full_data[f.label] || ''} readOnly />}
                   </div>
                 ))}
               </div>
