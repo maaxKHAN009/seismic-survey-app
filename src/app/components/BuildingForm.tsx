@@ -119,7 +119,7 @@ const Tooltip = ({ text }: { text: string }) => {
         <Info size={14} strokeWidth={2.5} />
       </button>
       {isOpen && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-56 p-4 bg-[#FFDC00] text-[#111111] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-xs font-bold leading-relaxed border-2 border-[#111111] animate-in fade-in zoom-in-95">
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-56 p-4 bg-[#FFDC00] text-[#111111] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] text-black font-bold leading-relaxed border-2 border-[#111111] animate-in fade-in zoom-in-95">
           <p className="border-b-2 border-[#111111]/20 pb-1 mb-1 uppercase font-black text-[9px] tracking-widest">Protocol Guide</p>
           {text}
           <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-[#FFDC00]" />
@@ -192,7 +192,7 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
             </div>
             <div className="flex-1 min-w-0">
               <input type="text" value={img.label} onChange={(e) => updateLabel(i, e.target.value)} 
-                className="w-full bg-[#FFFFFF] p-2 rounded border border-[#AAAAAA] text-[#111111] text-xs font-bold outline-none focus:border-[#85144B]" 
+                className="w-full bg-[#FFFFFF] p-2 rounded border border-[#AAAAAA] text-[#111111] text-black font-bold outline-none focus:border-[#85144B]" 
                 placeholder="Label..." />
             </div>
             <button onClick={() => onChange(value.filter((_, idx) => idx !== i))} className="text-red-500 p-2 hover:bg-red-50 rounded-full"><Trash2 size={16} /></button>
@@ -203,7 +203,7 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
         disabled={uploading}
         className={`w-full py-5 md:py-6 border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${uploading ? 'bg-slate-50 border-blue-400' : 'bg-[#FFFFFF] border-[#AAAAAA] hover:bg-slate-50 hover:border-[#85144B]'}`}>
         <Camera size={24} className={uploading ? 'animate-pulse text-blue-600' : 'text-[#111111]'} />
-        <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-[#111111]">
+        <span className="text-[10px] md:text-black font-black uppercase tracking-widest text-[#111111]">
           {uploading ? 'Uploading...' : 'Add Photos'}
         </span>
         <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageChange} />
@@ -522,19 +522,19 @@ export default function BuildingForm() {
       {/* Header Rebranding */}
       <div className="text-center space-y-1">
          <h1 className="text-2xl md:text-3xl font-black text-[#001F3F] tracking-tighter">UET x EPFL</h1>
-         <p className="text-xs font-bold text-[#85144B] uppercase tracking-[0.2em]">Building Inventory Proforma</p>
+         <p className="text-black font-bold text-[#85144B] uppercase tracking-[0.2em]">Building Inventory Proforma</p>
       </div>
 
       {/* 1. Status Bar */}
       <div className={`p-4 rounded-xl border-2 flex items-center justify-between shadow-sm ${isOnline ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
         <div className="flex items-center gap-2">
           {isOnline ? <Wifi className="text-green-700" size={20} /> : <WifiOff className="text-orange-700" size={20} />}
-          <span className={`text-xs font-black uppercase ${isOnline ? 'text-green-900' : 'text-orange-900'}`}>
+          <span className={`text-black font-black uppercase ${isOnline ? 'text-green-900' : 'text-orange-900'}`}>
             {isOnline ? 'System Online' : 'Offline Vault Active'}
           </span>
         </div>
         {pendingCount > 0 && isOnline && (
-          <button onClick={runSync} disabled={syncing} className="bg-[#85144B] text-white px-4 py-2 rounded-lg text-xs font-black animate-pulse flex items-center gap-2 shadow-md">
+          <button onClick={runSync} disabled={syncing} className="bg-[#85144B] text-white px-4 py-2 rounded-lg text-black font-black animate-pulse flex items-center gap-2 shadow-md">
             <RefreshCcw size={14} className={syncing ? 'animate-spin' : ''} /> PUSH {pendingCount}
           </button>
         )}
@@ -554,7 +554,7 @@ export default function BuildingForm() {
       {showAdminPanel && !isAdmin && (
         <div className="bg-slate-100 p-6 rounded-2xl border-2 border-dashed border-slate-300 max-w-sm mx-auto text-center">
           <input type="password" placeholder="Passcode" className="w-full p-3 rounded-xl border text-center font-bold text-lg mb-3 text-black" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <button onClick={() => password === 'swiss2026' ? (setIsAdmin(true), setShowAdminPanel(false), setPassword('')) : alert('Denied')} className="w-full bg-[#001F3F] text-[#39CCCC] p-3 rounded-xl font-black text-xs uppercase">Login</button>
+          <button onClick={() => password === 'swiss2026' ? (setIsAdmin(true), setShowAdminPanel(false), setPassword('')) : alert('Denied')} className="w-full bg-[#001F3F] text-[#39CCCC] p-3 rounded-xl font-black text-black uppercase">Login</button>
         </div>
       )}
 
@@ -565,7 +565,7 @@ export default function BuildingForm() {
           {/* Data List */}
           <div className="bg-white p-6 rounded-3xl border-2 border-[#001F3F] shadow-xl space-y-4">
              <div className="flex justify-between items-center border-b pb-3">
-                 <h3 className="font-black text-[#001F3F] text-xs">DATA RECORDS</h3>
+                 <h3 className="font-black text-[#001F3F] text-black">DATA RECORDS</h3>
                  <div className="flex gap-2">
                      <button onClick={deleteSelected} className="bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded">PURGE ({selectedRows.size})</button>
                  </div>
@@ -574,7 +574,7 @@ export default function BuildingForm() {
              
              <div className="max-h-60 overflow-y-auto">
                  {paginatedReports.map(r => (
-                     <div key={r.id} className="flex justify-between items-center p-3 border-b text-xs">
+                     <div key={r.id} className="flex justify-between items-center p-3 border-b text-black">
                          <span className="font-bold">{r.building_id}</span>
                          <div className="flex gap-2">
                              <button onClick={() => setViewingImages(Object.values(r.full_data).flatMap(v => (Array.isArray(v) && v[0]?.url) ? v : []))} className="text-[#001F3F]"><Eye size={14}/></button>
@@ -588,31 +588,31 @@ export default function BuildingForm() {
 
           {/* PROTOCOL EDITOR (Sectioned) */}
           <div className="bg-[#001F3F] p-6 rounded-3xl text-white space-y-6 shadow-lg">
-            <h3 className="text-xs font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">1. Create Section</h3>
+            <h3 className="text-black font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">1. Create Section</h3>
             <div className="flex gap-2">
-                <input type="text" placeholder="Section Name (e.g. Wall System)" className="flex-1 p-3 bg-white/10 rounded-xl text-xs font-bold border border-white/10 text-white" value={newSectionTitle} onChange={(e) => setNewSectionTitle(e.target.value)} />
-                <button onClick={addSection} className="bg-[#39CCCC] text-[#001F3F] px-4 rounded-xl font-black text-xs">ADD</button>
+                <input type="text" placeholder="Section Name (e.g. Wall System)" className="flex-1 p-3 bg-white/10 rounded-xl text-black font-bold border border-white/10 text-white" value={newSectionTitle} onChange={(e) => setNewSectionTitle(e.target.value)} />
+                <button onClick={addSection} className="bg-[#39CCCC] text-[#001F3F] px-4 rounded-xl font-black text-black">ADD</button>
             </div>
 
-            <h3 className="text-xs font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">2. Add Field to Section</h3>
+            <h3 className="text-black font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">2. Add Field to Section</h3>
             <div className="space-y-3">
-                <select className="w-full p-3 bg-white rounded-xl text-xs font-bold border border-white/10 text-black" value={targetSectionId} onChange={(e) => setTargetSectionId(e.target.value)}>
+                <select className="w-full p-3 bg-white rounded-xl text-black font-bold border border-white/10 text-black" value={targetSectionId} onChange={(e) => setTargetSectionId(e.target.value)}>
                     <option value="">Select Target Section...</option>
                     {sections.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                 </select>
 
                 <div className="grid grid-cols-2 gap-3">
-                    <input type="text" placeholder="Field Label" className="p-3 bg-white/10 rounded-xl text-xs font-bold border border-black/10 text-black" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
-                    <select className="p-3 bg-white rounded-xl text-xs font-bold border border-white/10 text-black" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
+                    <input type="text" placeholder="Field Label" className="p-3 bg-white/10 rounded-xl text-black font-bold border border-black/10 text-black" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
+                    <select className="p-3 bg-white rounded-xl text-black font-bold border border-white/10 text-black" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
                         <option value="text">Text</option><option value="number">Number</option><option value="select">Dropdown</option><option value="checkbox">Check</option><option value="image">Photo</option><option value="gps">GPS</option>
                     </select>
                 </div>
                 {newFieldType === 'select' && (
                   <div className="flex gap-2">
-                      <input type="text" placeholder="Options (comma separated)" className="flex-1 p-3 bg-white/10 rounded-xl text-xs" value={newOptions.join(',')} onChange={(e) => setNewOptions(e.target.value.split(','))} />
+                      <input type="text" placeholder="Options (comma separated)" className="flex-1 p-3 bg-white/10 rounded-xl text-black" value={newOptions.join(',')} onChange={(e) => setNewOptions(e.target.value.split(','))} />
                   </div>
                 )}
-                <button onClick={addField} disabled={!targetSectionId} className="w-full bg-[#39CCCC] text-[#001F3F] p-3 rounded-xl font-black text-xs uppercase tracking-widest mt-2 disabled:opacity-50">DEPLOY FIELD</button>
+                <button onClick={addField} disabled={!targetSectionId} className="w-full bg-[#39CCCC] text-[#001F3F] p-3 rounded-xl font-black text-black uppercase tracking-widest mt-2 disabled:opacity-50">DEPLOY FIELD</button>
             </div>
           </div>
         </div>
@@ -637,7 +637,7 @@ export default function BuildingForm() {
                     {section.fields.map(f => (
                         <div key={f.id} className="bg-white p-4 sm:p-6 rounded-2xl border-2 border-slate-100 shadow-sm relative hover:border-blue-200 transition-colors">
                             <div className="flex justify-between items-center mb-2">
-                                <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111] flex items-center gap-1">
+                                <label className="text-[10px] sm:text-black font-black uppercase text-[#111111] flex items-center gap-1">
                                     {f.label} <Tooltip text={f.tooltip} />
                                     {f.required && <span className="text-red-500">*</span>}
                                 </label>
@@ -672,7 +672,7 @@ export default function BuildingForm() {
 
                             {f.type === 'gps' && (
                                 <div className="flex gap-2">
-                                    <input type="text" readOnly className="flex-1 p-3 bg-slate-100 rounded-xl font-mono text-xs border-2" value={formData[f.label] || 'Waiting for signal...'} />
+                                    <input type="text" readOnly className="flex-1 p-3 bg-slate-100 rounded-xl font-mono text-black border-2" value={formData[f.label] || 'Waiting for signal...'} />
                                     <button onClick={() => captureGPS(f.label)} className="bg-[#85144B] text-white p-3 rounded-xl hover:bg-[#600e35] flex items-center justify-center gap-2">
                                         {locating ? <Loader2 className="animate-spin" size={18} /> : <MapPin size={18} />}
                                     </button>
@@ -682,19 +682,19 @@ export default function BuildingForm() {
                             {f.type === 'checkbox' && (
                                 <label className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl border-2 border-transparent hover:border-[#2ECC40] transition-all cursor-pointer">
                                     <input type="checkbox" className="w-6 h-6 accent-[#2ECC40] rounded" checked={!!formData[f.label]} onChange={(e) => setFormData({...formData, [f.label]: e.target.checked})} />
-                                    <span className="text-xs font-bold uppercase text-[#111111]">Verified</span>
+                                    <span className="text-black font-bold uppercase text-[#111111]">Verified</span>
                                 </label>
                             )}
                         </div>
                     ))}
-                    {section.fields.length === 0 && <p className="text-xs text-slate-900 italic text-center py-4">No fields in this section yet.</p>}
+                    {section.fields.length === 0 && <p className="text-black text-slate-900 italic text-center py-4">No fields in this section yet.</p>}
                 </div>
             </div>
         ))}
       </div>
 
       {!isAdmin && (
-        <button onClick={submitReport} className="w-full bg-[#85144B] text-[#FFFFFF] font-black py-5 rounded-[2rem] shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs sticky bottom-4 z-10 border-4 border-white ring-2 ring-slate-100">
+        <button onClick={submitReport} className="w-full bg-[#85144B] text-[#FFFFFF] font-black py-5 rounded-[2rem] shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-black sticky bottom-4 z-10 border-4 border-white ring-2 ring-slate-100">
           <CheckSquare size={18} /> {isOnline ? 'SUBMIT PROFORMA' : 'SAVE LOCALLY'}
         </button>
       )}
@@ -721,7 +721,7 @@ export default function BuildingForm() {
             {/* Iterate Sections -> Fields */}
             {sections.map(sec => (
               <div key={sec.id} className="space-y-3 border-b pb-4">
-                <h4 className="text-xs font-black text-[#85144B] uppercase tracking-widest">{sec.title}</h4>
+                <h4 className="text-black font-black text-[#85144B] uppercase tracking-widest">{sec.title}</h4>
                 {sec.fields.map(f => (
                   <div key={f.id} className="space-y-1">
                     <label className="text-[10px] font-bold uppercase text-black">{f.label}</label>
@@ -740,7 +740,7 @@ export default function BuildingForm() {
                     {f.type === 'checkbox' && (
                        <div className="flex items-center gap-2">
                          <input type="checkbox" className="w-5 h-5 accent-[#85144B]" checked={!!editingReport.full_data[f.label]} onChange={(e) => handleEditChange(f.label, e.target.checked)} />
-                         <span className="text-xs font-bold">Verified</span>
+                         <span className="text-black font-bold">Verified</span>
                        </div>
                     )}
 
@@ -748,7 +748,7 @@ export default function BuildingForm() {
                        <ImageUpload label={f.label} value={editingReport.full_data[f.label] || []} onChange={(imgs) => handleEditChange(f.label, imgs)} />
                     )}
 
-                    {f.type === 'gps' && <input type="text" className="w-full p-3 bg-slate-100 font-mono text-xs border" value={editingReport.full_data[f.label] || ''} readOnly />}
+                    {f.type === 'gps' && <input type="text" className="w-full p-3 bg-slate-100 font-mono text-black border" value={editingReport.full_data[f.label] || ''} readOnly />}
                   </div>
                 ))}
               </div>
