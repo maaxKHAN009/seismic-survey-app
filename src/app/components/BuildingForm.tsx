@@ -554,7 +554,7 @@ export default function BuildingForm() {
       {showAdminPanel && !isAdmin && (
         <div className="bg-slate-100 p-6 rounded-2xl border-2 border-dashed border-slate-300 max-w-sm mx-auto text-center">
           <input type="password" placeholder="Passcode" className="w-full p-3 rounded-xl border text-center font-bold text-lg mb-3 text-black" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <button onClick={() => password === 'swiss2026' ? (setIsAdmin(true), setShowAdminPanel(false), setPassword('')) : alert('Denied')} className="w-full bg-[#001F3F] text-[#39CCCC] p-3 rounded-xl font-black text-black uppercase">Login</button>
+          <button onClick={() => password === 'swiss2026' ? (setIsAdmin(true), setShowAdminPanel(false), setPassword('')) : alert('Denied')} className="w-full bg-[#001F3F] text-[#39CCCC] p-3 rounded-xl font-black text-white uppercase">Login</button>
         </div>
       )}
 
@@ -596,14 +596,14 @@ export default function BuildingForm() {
 
             <h3 className="text-white font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">2. Add Field to Section</h3>
             <div className="space-y-3">
-                <select className="w-full p-3 bg-white rounded-xl text-black font-bold border border-white/10 text-black" value={targetSectionId} onChange={(e) => setTargetSectionId(e.target.value)}>
+                <select className="w-full p-3 bg-white/10 rounded-xl text-black font-bold border border-white/10 text-black" value={targetSectionId} onChange={(e) => setTargetSectionId(e.target.value)}>
                     <option value="">Select Target Section...</option>
                     {sections.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                 </select>
 
                 <div className="grid grid-cols-2 gap-3">
                     <input type="text" placeholder="Field Label" className="p-3 bg-white/10 rounded-xl text-white font-bold border border-black/10 text-black" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
-                    <select className="p-3 bg-white rounded-xl text-black font-bold border border-white/10 text-black" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
+                    <select className="p-3 bg-white/10 rounded-xl text-black font-bold border border-white/10 text-black" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
                         <option value="text">Text</option><option value="number">Number</option><option value="select">Dropdown</option><option value="checkbox">Check</option><option value="image">Photo</option><option value="gps">GPS</option>
                     </select>
                 </div>
