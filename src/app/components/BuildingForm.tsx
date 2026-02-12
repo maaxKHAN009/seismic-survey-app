@@ -262,7 +262,36 @@ export default function BuildingForm() {
   const [newSubLabel, setNewSubLabel] = useState('');
   const [newSubType, setNewSubType] = useState<SubFieldType>('text');
   const [newSubOptions, setNewSubOptions] = useState<string[]>(['']);
+// 1. Define the missing functions
+const checkPending = async () => {
+  if (localDB && localDB.outbox) {
+    setPendingCount(await localDB.outbox.count());
+  }
+};
 
+const loadSchema = async () => { 
+  try {
+    const { data } = await supabase.from('survey_schema').select('fields').limit(1).single(); 
+    if(data && data.fields) { 
+      setSections(data.fields); 
+      if (data.fields.length > 0) setTargetSectionId(data.fields[0].id); 
+    } else { 
+      setSections(DEFAULT_SECTIONS); 
+      setTargetSectionId(DEFAULT_SECTIONS[0].id); 
+    }
+  } catch (error) {
+    setSections(DEFAULT_SECTIONS);
+  }
+};
+
+const loadReports = async () => { 
+  try {
+    const { data } = await supabase.from('building_reports').select('*').order('created_at', {ascending: false}); 
+    if(data) setReports(data); 
+  } catch (error) {
+    console.error("Archive sync failed");
+  }
+};
   useEffect(() => {
     // 1. Initial Data & Status Loads
     loadSchema();
