@@ -296,7 +296,6 @@ const loadReports = async () => {
     // 1. Initial Data & Status Loads
     loadSchema();
     loadReports();
-    checkPending();
   
     // 2. Connectivity Listeners
     const update = () => setIsOnline(navigator.onLine);
@@ -325,7 +324,6 @@ const loadReports = async () => {
     };
   }, []); // Empty dependency array ensures this runs once
   
-  const checkPending = async () => setPendingCount(await localDB.outbox.count());
   // --- SYNC ENGINE ---
   const runSync = async () => {
     if (!isOnline || syncing) return;
