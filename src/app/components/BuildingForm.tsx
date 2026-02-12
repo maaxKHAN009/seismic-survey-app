@@ -13,7 +13,7 @@ import {
   Info, Database, Settings, PlusCircle, Trash2, 
   X, CheckSquare, Camera, ChevronRight, FileDown, 
   Filter, Square, CheckSquare as CheckIcon, Search, Eye, Tag, Wifi, WifiOff, RefreshCcw, 
-  LayoutGrid, ListFilter, Edit3, ArrowLeft, ArrowRight, AlertTriangle, Layers, MapPin, Loader2, PenTool, Grip, ArrowUp, ArrowDown, Plus
+  LayoutGrid, ListFilter, Edit3, ArrowLeft, ArrowRight, AlertTriangle, Layers, MapPin, Loader2, PenTool, Grip, ArrowUp, ArrowDown, Plus, HardDrive
 } from 'lucide-react';
 
 // --- Offline Database Schema (Dexie) ---
@@ -27,7 +27,6 @@ class SeismicDB extends Dexie {
 const localDB = new SeismicDB();
 
 // --- Types ---
-// NEW: Added 'multi_select' and 'dynamic_series'
 type FieldType = 'text' | 'number' | 'select' | 'checkbox' | 'image' | 'gps' | 'group' | 'multi_select' | 'dynamic_series';
 type SubFieldType = 'text' | 'number' | 'select' | 'checkbox';
 
@@ -43,8 +42,8 @@ interface CustomField {
   label: string; 
   type: FieldType; 
   tooltip: string; 
-  options?: string[]; // Used for Select, Multi-Select options
-  subFields?: SubField[]; // For groups
+  options?: string[]; 
+  subFields?: SubField[]; 
   required?: boolean;
 }
 
@@ -173,7 +172,6 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
   );
 };
 
-// --- NEW: Multi-Select Component ---
 const MultiSelect = ({ options, value, onChange }: { options: string[], value: string[], onChange: (val: string[]) => void }) => {
     const toggle = (opt: string) => {
         if (value.includes(opt)) onChange(value.filter(v => v !== opt));
@@ -192,7 +190,6 @@ const MultiSelect = ({ options, value, onChange }: { options: string[], value: s
     );
 };
 
-// --- NEW: Dynamic Series Component (Surveyor Defined Rows) ---
 const DynamicSeries = ({ value, onChange }: { value: DynamicSeriesItem[], onChange: (val: DynamicSeriesItem[]) => void }) => {
     const addRow = () => {
         const nextIdx = value.length + 1;
@@ -232,6 +229,9 @@ export default function BuildingForm() {
   const [syncing, setSyncing] = useState(false);
   const [locating, setLocating] = useState(false);
   
+  // NEW: State for Offline Installation Prompt
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [password, setPassword] = useState('');
@@ -240,7 +240,6 @@ export default function BuildingForm() {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [reports, setReports] = useState<BuildingReport[]>([]);
   
-  // Admin Features
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDistrict, setFilterDistrict] = useState('All');
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -249,7 +248,6 @@ export default function BuildingForm() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
 
-  // Schema Editor
   const [newSectionTitle, setNewSectionTitle] = useState('');
   const [targetSectionId, setTargetSectionId] = useState('');
   const [newFieldLabel, setNewFieldLabel] = useState('');
@@ -257,52 +255,59 @@ export default function BuildingForm() {
   const [newFieldTooltip, setNewFieldTooltip] = useState('');
   const [newOptions, setNewOptions] = useState<string[]>(['']);
   
-  // Sub-Field Builder
   const [tempSubFields, setTempSubFields] = useState<SubField[]>([]);
   const [newSubLabel, setNewSubLabel] = useState('');
   const [newSubType, setNewSubType] = useState<SubFieldType>('text');
   const [newSubOptions, setNewSubOptions] = useState<string[]>(['']);
-// 1. Define the missing functions
-const checkPending = async () => {
-  if (localDB && localDB.outbox) {
-    setPendingCount(await localDB.outbox.count());
-  }
-};
 
-const loadSchema = async () => { 
-  try {
-    const { data } = await supabase.from('survey_schema').select('fields').limit(1).single(); 
-    if(data && data.fields) { 
-      setSections(data.fields); 
-      if (data.fields.length > 0) setTargetSectionId(data.fields[0].id); 
-    } else { 
-      setSections(DEFAULT_SECTIONS); 
-      setTargetSectionId(DEFAULT_SECTIONS[0].id); 
+  // Functions for Initial Loads
+  const checkPending = async () => {
+    if (localDB && localDB.outbox) {
+      setPendingCount(await localDB.outbox.count());
     }
-  } catch (error) {
-    setSections(DEFAULT_SECTIONS);
-  }
-};
+  };
 
-const loadReports = async () => { 
-  try {
-    const { data } = await supabase.from('building_reports').select('*').order('created_at', {ascending: false}); 
-    if(data) setReports(data); 
-  } catch (error) {
-    console.error("Archive sync failed");
-  }
-};
+  const loadSchema = async () => { 
+    try {
+      const { data } = await supabase.from('survey_schema').select('fields').limit(1).single(); 
+      if(data && data.fields) { 
+        setSections(data.fields); 
+        if (data.fields.length > 0) setTargetSectionId(data.fields[0].id); 
+      } else { 
+        setSections(DEFAULT_SECTIONS); 
+        setTargetSectionId(DEFAULT_SECTIONS[0].id); 
+      }
+    } catch (error) {
+      setSections(DEFAULT_SECTIONS);
+    }
+  };
+
+  const loadReports = async () => { 
+    try {
+      const { data } = await supabase.from('building_reports').select('*').order('created_at', {ascending: false}); 
+      if(data) setReports(data); 
+    } catch (error) {
+      console.error("Archive sync failed");
+    }
+  };
+
   useEffect(() => {
-    // 1. Initial Data & Status Loads
     loadSchema();
     loadReports();
+    checkPending();
   
-    // 2. Connectivity Listeners
     const update = () => setIsOnline(navigator.onLine);
     window.addEventListener('online', update); 
     window.addEventListener('offline', update);
   
-    // 3. Offline Engine Registration (MOVED INSIDE)
+    // NEW: Capture Install Prompt Event
+    const handlePrompt = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handlePrompt);
+
+    // Service Worker Registration
     if ('serviceWorker' in navigator) {
       const handleServiceWorker = async () => {
         try {
@@ -315,14 +320,20 @@ const loadReports = async () => {
       window.addEventListener('load', handleServiceWorker);
     }
   
-    // 4. Cleanup Function
     return () => { 
       window.removeEventListener('online', update); 
       window.removeEventListener('offline', update);
-      // Note: window.removeEventListener('load', handleServiceWorker) isn't 
-      // strictly necessary here but good practice if defined locally.
+      window.removeEventListener('beforeinstallprompt', handlePrompt);
     };
-  }, []); // Empty dependency array ensures this runs once
+  }, []); 
+
+  // NEW: Trigger Function for Offline Download
+  const handleOfflineInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') setInstallPrompt(null);
+  };
   
   // --- SYNC ENGINE ---
   const runSync = async () => {
@@ -332,7 +343,6 @@ const loadReports = async () => {
       const pending = await localDB.outbox.toArray();
       for (const report of pending) {
         const processedData = JSON.parse(JSON.stringify(report.full_data));
-        // Image Processing...
         for (const key in processedData) {
             const val = processedData[key];
             if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && val[0].isLocal) {
@@ -372,7 +382,7 @@ const loadReports = async () => {
     }
   };
 
-  const captureGPS = (label: string) => { // Added the 'label' parameter here
+  const captureGPS = (label: string) => { 
     setLocating(true);
     if (!navigator.geolocation) {
       alert("GPS Error: Hardware sensor not detected.");
@@ -385,7 +395,6 @@ const loadReports = async () => {
         const lat = pos.coords.latitude.toFixed(8);
         const lon = pos.coords.longitude.toFixed(8);
         
-        // Atomic Splitting for Python Tool Compatibility
         setFormData(prev => ({ 
           ...prev, 
           [label]: `${lat}, ${lon}`,
@@ -516,7 +525,6 @@ const loadReports = async () => {
       setEditingReport({ ...editingReport, full_data: { ...editingReport.full_data, [fieldLabel]: value } });
   };
 
-  // --- EXCEL EXPORT (SMART FLATTENING) ---
   const exportToExcel = async (subset?: BuildingReport[]) => {
     const dataToExport = subset || reports;
     if (dataToExport.length === 0) return alert("No data.");
@@ -533,8 +541,6 @@ const loadReports = async () => {
         if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].url) {
           imageFields.set(k, Math.max(imageFields.get(k) || 0, v.length));
         } else if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].label && v[0].value !== undefined) {
-             // Detect Dynamic Series (e.g. Story Heights)
-             // We need to find all unique labels used (Story 1, Story 2, etc.)
              v.forEach((item: DynamicSeriesItem) => dynamicSeriesFields.add(`${k} [${item.label}]`));
         } else {
           textHeaders.add(k);
@@ -544,7 +550,6 @@ const loadReports = async () => {
 
     const columns: any[] = [{ header: 'DATE', key: 'date', width: 15 }, { header: 'ID', key: 'id', width: 20 }];
     textHeaders.forEach(h => columns.push({ header: h.toUpperCase(), key: h, width: 25 }));
-    // Add Dynamic Series Columns
     Array.from(dynamicSeriesFields).sort().forEach(h => columns.push({ header: h.toUpperCase(), key: h, width: 20 }));
 
     imageFields.forEach((max, label) => {
@@ -556,13 +561,11 @@ const loadReports = async () => {
     dataToExport.forEach(r => {
       const row: any = { date: new Date(r.created_at).toLocaleDateString(), id: r.building_id };
       
-      // Standard Fields
       textHeaders.forEach(h => {
           const val = r.full_data[h];
           row[h] = Array.isArray(val) ? val.join(', ') : val ? String(val) : '';
       });
 
-      // Dynamic Series Flattening
       Object.entries(r.full_data).forEach(([k, v]) => {
           if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].label && v[0].value !== undefined) {
               v.forEach((item: DynamicSeriesItem) => {
@@ -571,7 +574,6 @@ const loadReports = async () => {
           }
       });
 
-      // Images
       imageFields.forEach((max, label) => {
         const photos = r.full_data[label];
         if (Array.isArray(photos)) photos.forEach((p, idx) => {
@@ -581,7 +583,6 @@ const loadReports = async () => {
       worksheet.addRow(row);
     });
 
-    // Formatting
     worksheet.eachRow((row, i) => {
         row.eachCell(c => {
           c.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -679,14 +680,12 @@ const loadReports = async () => {
                     </select>
                 </div>
 
-                {/* SELECT / MULTI-SELECT OPTIONS */}
                 {(newFieldType === 'select' || newFieldType === 'multi_select') && (
                   <div className="flex gap-2">
                       <input type="text" placeholder="Options (comma separated)" className="flex-1 p-3 bg-white/10 rounded-xl text-xs text-white" value={newOptions.join(',')} onChange={(e) => setNewOptions(e.target.value.split(','))} />
                   </div>
                 )}
 
-                {/* GROUP SUB-FIELDS BUILDER */}
                 {newFieldType === 'group' && (
                    <div className="bg-black/20 p-3 rounded-xl space-y-2">
                        <p className="text-[10px] text-[#39CCCC] font-bold">Configure Sub-Fields</p>
@@ -741,7 +740,6 @@ const loadReports = async () => {
                                 )}
                             </div>
 
-                            {/* DYNAMIC INPUT RENDERING */}
                             {f.type === 'text' && <input type="text" className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" placeholder="..." value={formData[f.label] || ''} onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} />}
                             {f.type === 'number' && <input type="number" className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" placeholder="0" value={formData[f.label] || ''} onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} />}
                             
@@ -808,12 +806,25 @@ const loadReports = async () => {
       </div>
 
       {!isAdmin && (
-        <button onClick={submitReport} className="w-full bg-[#85144B] text-[#FFFFFF] font-black py-5 rounded-[2rem] shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs sticky bottom-4 z-10 border-4 border-white ring-2 ring-slate-100">
-          <CheckSquare size={18} /> {isOnline ? 'SUBMIT PROFORMA' : 'SAVE LOCALLY'}
-        </button>
+        <>
+          {/* NEW: Download for Offline Use Button UI */}
+          {installPrompt && (
+            <div className="flex justify-center mb-4">
+              <button 
+                onClick={handleOfflineInstall}
+                className="btn btn-outline btn-sm border-2 border-emerald-600 text-emerald-800 rounded-2xl px-6 font-black uppercase tracking-widest text-[10px] gap-2 hover:bg-emerald-50"
+              >
+                <HardDrive size={14} /> Download for Offline Use
+              </button>
+            </div>
+          )}
+
+          <button onClick={submitReport} className="w-full bg-[#85144B] text-[#FFFFFF] font-black py-5 rounded-[2rem] shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs sticky bottom-4 z-10 border-4 border-white ring-2 ring-slate-100">
+            <CheckSquare size={18} /> {isOnline ? 'SUBMIT PROFORMA' : 'SAVE LOCALLY'}
+          </button>
+        </>
       )}
 
-      {/* Image Viewer */}
       {viewingImages && (
         <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4">
             <button onClick={() => setViewingImages(null)} className="absolute top-4 right-4 text-white"><X size={32}/></button>
@@ -823,7 +834,6 @@ const loadReports = async () => {
         </div>
       )}
 
-      {/* 7. SUPER ADMIN EDIT MODAL */}
       {editingReport && (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl space-y-4">
@@ -832,7 +842,6 @@ const loadReports = async () => {
               <button onClick={() => setEditingReport(null)}><X /></button>
             </div>
             
-            {/* Iterate Sections -> Fields */}
             {sections.map(sec => (
               <div key={sec.id} className="space-y-3 border-b pb-4">
                 <h4 className="text-xs font-black text-[#85144B] uppercase tracking-widest">{sec.title}</h4>
