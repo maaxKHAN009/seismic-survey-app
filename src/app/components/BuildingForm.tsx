@@ -264,6 +264,13 @@ export default function BuildingForm() {
   const [newSubOptions, setNewSubOptions] = useState<string[]>(['']);
 
   useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('Offline Engine: Registered', reg))
+          .catch(err => console.error('Offline Engine: Failed', err));
+      });
+    }
     loadSchema();
     loadReports();
     const update = () => setIsOnline(navigator.onLine);
