@@ -1,17 +1,23 @@
 import BuildingForm from './components/BuildingForm';
-import { Metadata } from 'next';
+import { Metadata, Viewport } from 'next';
 
-// This is the correct way to link the manifest in Next.js
+// 1. Move viewport settings here to fix the warnings
+export const viewport: Viewport = {
+  themeColor: '#14452F',
+  width: 'device-width',
+  initialScale: 1,
+};
+
+// 2. Metadata remains on the server
 export const metadata: Metadata = {
   manifest: '/manifest.json',
-  title: 'Building Survey | UET x EPFL',
+  title: 'Building Specific Survey | UET x EPFL',
 };
 
 export default function Page() {
-  // Ensure BuildingForm is called as a function, as it may not be a React component (JSX) itself
   return (
     <main>
-      {typeof BuildingForm === "function" ? <>{BuildingForm()}</> : null}
+      <BuildingForm />
     </main>
   );
 }

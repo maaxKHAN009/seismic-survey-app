@@ -264,40 +264,39 @@ export default function BuildingForm() {
   const [newSubOptions, setNewSubOptions] = useState<string[]>(['']);
 
   useEffect(() => {
+    // 1. Initial Data & Status Loads
     loadSchema();
     loadReports();
-    const update = () => setIsOnline(navigator.onLine);
-    window.addEventListener('online', update); window.addEventListener('offline', update);
     checkPending();
-    return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
-  }, []);
-
-  const checkPending = async () => setPendingCount(await localDB.outbox.count());
   
-  const loadSchema = async () => { 
-    const { data } = await supabase.from('survey_schema').select('fields').limit(1).single(); 
-    if(data && data.fields) { setSections(data.fields); if (data.fields.length > 0) setTargetSectionId(data.fields[0].id); } 
-    else { setSections(DEFAULT_SECTIONS); setTargetSectionId(DEFAULT_SECTIONS[0].id); }
-  };
+    // 2. Connectivity Listeners
+    const update = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', update); 
+    window.addEventListener('offline', update);
   
-  const loadReports = async () => { 
-    const { data } = await supabase.from('building_reports').select('*').order('created_at', {ascending: false}); 
-    if(data) setReports(data); 
-  };
-  if ('serviceWorker' in navigator) {
-    const handleServiceWorker = async () => {
-      try {
-        // This registers the sw.js you created in the /public folder
-        const registration = await navigator.serviceWorker.register('/sw.js');
-        console.log('Offline Engine Active:', registration.scope);
-      } catch (error) {
-        console.error('Offline Registration Failed:', error);
-      }
+    // 3. Offline Engine Registration (MOVED INSIDE)
+    if ('serviceWorker' in navigator) {
+      const handleServiceWorker = async () => {
+        try {
+          const registration = await navigator.serviceWorker.register('/sw.js');
+          console.log('Offline Engine Active:', registration.scope);
+        } catch (error) {
+          console.error('Offline Registration Failed:', error);
+        }
+      };
+      window.addEventListener('load', handleServiceWorker);
+    }
+  
+    // 4. Cleanup Function
+    return () => { 
+      window.removeEventListener('online', update); 
+      window.removeEventListener('offline', update);
+      // Note: window.removeEventListener('load', handleServiceWorker) isn't 
+      // strictly necessary here but good practice if defined locally.
     };
-
-    window.addEventListener('load', handleServiceWorker);
-    return () => window.removeEventListener('load', handleServiceWorker);
-  }
+  }, []); // Empty dependency array ensures this runs once
+  
+  const checkPending = async () => setPendingCount(await localDB.outbox.count());
   // --- SYNC ENGINE ---
   const runSync = async () => {
     if (!isOnline || syncing) return;
