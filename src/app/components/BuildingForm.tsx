@@ -264,20 +264,6 @@ export default function BuildingForm() {
   const [newSubOptions, setNewSubOptions] = useState<string[]>(['']);
 
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      const handleServiceWorker = async () => {
-        try {
-          // This registers the sw.js you created in the /public folder
-          const registration = await navigator.serviceWorker.register('/sw.js');
-          console.log('Offline Engine Active:', registration.scope);
-        } catch (error) {
-          console.error('Offline Registration Failed:', error);
-        }
-      };
-  
-      window.addEventListener('load', handleServiceWorker);
-      return () => window.removeEventListener('load', handleServiceWorker);
-    }
     loadSchema();
     loadReports();
     const update = () => setIsOnline(navigator.onLine);
@@ -298,7 +284,20 @@ export default function BuildingForm() {
     const { data } = await supabase.from('building_reports').select('*').order('created_at', {ascending: false}); 
     if(data) setReports(data); 
   };
+  if ('serviceWorker' in navigator) {
+    const handleServiceWorker = async () => {
+      try {
+        // This registers the sw.js you created in the /public folder
+        const registration = await navigator.serviceWorker.register('/sw.js');
+        console.log('Offline Engine Active:', registration.scope);
+      } catch (error) {
+        console.error('Offline Registration Failed:', error);
+      }
+    };
 
+    window.addEventListener('load', handleServiceWorker);
+    return () => window.removeEventListener('load', handleServiceWorker);
+  }
   // --- SYNC ENGINE ---
   const runSync = async () => {
     if (!isOnline || syncing) return;
