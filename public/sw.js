@@ -1,11 +1,19 @@
-const CACHE_NAME = 'building-app-v1';
-const ASSETS = ['/', '/manifest.json', '/icon-192.png'];
+const CACHE_NAME = 'uet-building-v1';
+const ASSETS_TO_CACHE = [
+  '/',
+  '/manifest.json',
+  // Add any other core CSS/JS paths here
+];
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
+  );
 });
 
-self.addEventListener('fetch', (e) => {
-  // If offline, serve from cache; if online, get fresh data
-  e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+// CRITICAL: The browser checks for this listener to enable the Install button
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request).then((response) => response || fetch(event.request))
+  );
 });

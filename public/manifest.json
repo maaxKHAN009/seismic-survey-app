@@ -1,9 +1,22 @@
 {
-  "name": "Building Specific Survey",
-  "short_name": "BuildApp",
+  "name": "UET x EPFL Building Survey",
+  "short_name": "BuildingApp",
+  "description": "Seismic Vulnerability Building Module",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#F0FFF4",
   "theme_color": "#14452F",
-  "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
