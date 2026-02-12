@@ -333,19 +333,19 @@ export default function BuildingForm() {
     }
   };
 
-  const captureGPS = (fieldId: string) => {
-      setLocating(true);
-      if ("geolocation" in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
-              setFormData(prev => ({ ...prev, [fieldId]: coords })); setLocating(false); alert(`Location Locked!\nAccuracy: ±${Math.round(pos.coords.accuracy)}m`);
-            }, 
-            (err) => { setLocating(false); alert("GPS Error: " + err.message); },
-            { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
-          );
-      } else { setLocating(false); alert("GPS not found."); }
-  }
+  const captureGPS = () => {
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const lat = pos.coords.latitude.toFixed(8);
+      const lon = pos.coords.longitude.toFixed(8);
+      
+      setFormData(prev => ({
+        ...prev,
+        building_location: `${lat}, ${lon}`,
+        location_LATITUDE: lat,  // Discrete column for Python
+        location_LONGITUDE: lon   // Discrete column for Python
+      }));
+    }, null, { enableHighAccuracy: true });
+  };
 
   // --- ADMIN: SCHEMA MANAGEMENT & REORDERING ---
   const addSection = async () => {
