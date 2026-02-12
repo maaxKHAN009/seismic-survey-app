@@ -333,18 +333,36 @@ export default function BuildingForm() {
     }
   };
 
-  const captureGPS = () => {
-    navigator.geolocation.getCurrentPosition((pos) => {
-      const lat = pos.coords.latitude.toFixed(8);
-      const lon = pos.coords.longitude.toFixed(8);
-      
-      setFormData(prev => ({
-        ...prev,
-        building_location: `${lat}, ${lon}`,
-        location_LATITUDE: lat,  // Discrete column for Python
-        location_LONGITUDE: lon   // Discrete column for Python
-      }));
-    }, null, { enableHighAccuracy: true });
+  const captureGPS = (label: string) => { // Added the 'label' parameter here
+    setLocating(true);
+    if (!navigator.geolocation) {
+      alert("GPS Error: Hardware sensor not detected.");
+      setLocating(false);
+      return;
+    }
+  
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude.toFixed(8);
+        const lon = pos.coords.longitude.toFixed(8);
+        
+        // Atomic Splitting for Python Tool Compatibility
+        setFormData(prev => ({ 
+          ...prev, 
+          [label]: `${lat}, ${lon}`,
+          [`${label}_LATITUDE`]: lat,
+          [`${label}_LONGITUDE`]: lon
+        }));
+        
+        setLocating(false);
+        alert("GPS LOCK: Coordinates split into discrete columns.");
+      },
+      (err) => {
+        alert(`SIGNAL ERROR: ${err.message}`);
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
   };
 
   // --- ADMIN: SCHEMA MANAGEMENT & REORDERING ---
