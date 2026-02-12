@@ -265,11 +265,18 @@ export default function BuildingForm() {
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(reg => console.log('Offline Engine: Registered', reg))
-          .catch(err => console.error('Offline Engine: Failed', err));
-      });
+      const handleServiceWorker = async () => {
+        try {
+          // This registers the sw.js you created in the /public folder
+          const registration = await navigator.serviceWorker.register('/sw.js');
+          console.log('Offline Engine Active:', registration.scope);
+        } catch (error) {
+          console.error('Offline Registration Failed:', error);
+        }
+      };
+  
+      window.addEventListener('load', handleServiceWorker);
+      return () => window.removeEventListener('load', handleServiceWorker);
     }
     loadSchema();
     loadReports();
