@@ -303,18 +303,6 @@ export default function BuildingForm() {
       setInstallPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handlePrompt);
-
-    if ('serviceWorker' in navigator) {
-      const handleServiceWorker = async () => {
-        try {
-          const registration = await navigator.serviceWorker.register('/sw.js');
-          console.log('Offline Engine Active:', registration.scope);
-        } catch (error) {
-          console.error('Offline Registration Failed:', error);
-        }
-      };
-      window.addEventListener('load', handleServiceWorker);
-    }
   
     return () => { 
       window.removeEventListener('online', update); 

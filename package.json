@@ -11,6 +11,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.984.0",
     "@aws-sdk/s3-request-presigner": "^3.984.0",
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@supabase/supabase-js": "^2.94.1",
     "dexie": "^4.3.0",
     "exceljs": "^4.4.0",

@@ -1,16 +1,19 @@
-/** @type {import('next').Config} */
-const nextConfig = {
-    // Required for PWA file serving
-    reactStrictMode: true,
-    // This ensures your custom sw.js in /public is accessible
-    async rewrites() {
-      return [
-        {
-          source: '/sw.js',
-          destination: '/sw.js',
-        },
-      ];
-    },
-  };
-  
-  export default nextConfig;
+import withPWAInit from "@ducanh2912/next-pwa";
+
+const withPWA = withPWAInit({
+  dest: "public",
+  cacheOnFrontEndNav: true,
+  aggressiveFrontEndNavCaching: true,
+  reloadOnOnline: true,
+  swMinify: true,
+  disable: false, // Ensure it is always active
+  workboxOptions: {
+    skipWaiting: true,
+    disableDevLogs: true,
+  },
+});
+
+export default withPWA({
+  // Your existing Next.js config here
+  reactStrictMode: true,
+});
