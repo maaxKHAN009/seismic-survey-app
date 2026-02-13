@@ -691,7 +691,7 @@ export default function BuildingForm() {
       
       <div className="text-center space-y-1">
          <h1 className="text-2xl md:text-3xl font-black text-[#001F3F] tracking-tighter">UET x EPFL</h1>
-         <p className="text-xs font-bold text-[#85144B] uppercase tracking-[0.2em]">Building Inventory Proforma</p>
+         <p className="text-xs font-bold text-[#85144B] uppercase tracking-[0.2em]">Building Specific Survey</p>
       </div>
 
       <div className={`p-4 rounded-xl border-2 flex items-center justify-between shadow-sm ${isOnline ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>

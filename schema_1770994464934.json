@@ -1,0 +1,495 @@
+[
+  {
+    "id": "1770723772768",
+    "title": "Identification & Location",
+    "fields": [
+      {
+        "id": "1770723813608",
+        "type": "text",
+        "label": "Building ID",
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770723840192",
+        "type": "text",
+        "label": "Survey Date",
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770723856144",
+        "type": "text",
+        "label": "District/Tehsil",
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770723869968",
+        "type": "text",
+        "label": "Village/Locality",
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770723882808",
+        "type": "gps",
+        "label": "GPS Coordinates",
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770723899512",
+        "type": "text",
+        "label": "Surveyor Name",
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770723959688",
+        "type": "select",
+        "label": "Current Use",
+        "options": [
+          "Residential",
+          " Commercial",
+          " Religious",
+          " Mixed",
+          " Public",
+          " Storage",
+          " Other"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770724035639",
+        "type": "select",
+        "label": "Estimated Construction Age",
+        "options": [
+          "<10 yrs",
+          " 10-30 yrs",
+          " 30-60 yrs",
+          " 60-100 yrs",
+          " >100 yrs",
+          " Unknown"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770724069928",
+        "type": "select",
+        "label": "Occupancy Status",
+        "options": [
+          "Occupied",
+          " Partial",
+          " Vacant",
+          " Seasonal"
+        ],
+        "tooltip": "Observation required."
+      }
+    ]
+  },
+  {
+    "id": "1770724088807",
+    "title": "Construction Typology & Geometry",
+    "fields": [
+      {
+        "id": "1770724126632",
+        "type": "select",
+        "label": "Construction Type",
+        "options": [
+          "Stone",
+          " Block",
+          " Adobe",
+          " Mixed",
+          " Other"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770724218249",
+        "type": "select",
+        "label": "Plan Shape",
+        "options": [
+          "Rectangular",
+          " Square",
+          " L-Shaped",
+          " Irregular"
+        ],
+        "tooltip": "Observation required."
+      }
+    ]
+  },
+  {
+    "id": "1770724284239",
+    "title": "Manual Geometry Inputs",
+    "fields": [
+      {
+        "id": "1770733906821",
+        "type": "group",
+        "label": "Overall Plan Dimensions",
+        "tooltip": "Observation required.",
+        "subFields": [
+          {
+            "id": "sub_1770733894957",
+            "type": "number",
+            "label": "Length (ft)"
+          },
+          {
+            "id": "sub_1770733904231",
+            "type": "number",
+            "label": "Width (ft)"
+          }
+        ]
+      },
+      {
+        "id": "1770735689236",
+        "type": "dynamic_series",
+        "label": "Story Heights",
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770734065445",
+        "type": "number",
+        "label": "Total Built Area (sq ft)",
+        "tooltip": "Observation required."
+      }
+    ]
+  },
+  {
+    "id": "1770734085077",
+    "title": "Wall System",
+    "fields": [
+      {
+        "id": "1770734109436",
+        "type": "number",
+        "label": "External Wall Thickness (inches)",
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770734437861",
+        "type": "select",
+        "label": "Wall Material",
+        "options": [
+          "Random Rubble Stone",
+          " Course Stone",
+          " Semi-Dressed Stone",
+          " Solid Block",
+          " Hollow Block",
+          " Adobe"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770734476810",
+        "type": "select",
+        "label": "Mortar Type",
+        "options": [
+          "Mud",
+          " Lime",
+          " Cement",
+          " Mixed",
+          " Unknown"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770734505621",
+        "type": "select",
+        "label": "Bond Pattern",
+        "options": [
+          "Random",
+          " Coursed",
+          " Ashlar",
+          " Adobe Stacked"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770735611053",
+        "type": "multi_select",
+        "label": "Wall Condition",
+        "options": [
+          "Good",
+          " Cracked",
+          " Bulging",
+          " Damp",
+          " Severe Distress"
+        ],
+        "tooltip": "Observation required."
+      }
+    ]
+  },
+  {
+    "id": "1770735764849",
+    "title": "Openings-Manual Dimensions Required",
+    "fields": [
+      {
+        "id": "1770735779756",
+        "type": "number",
+        "label": "Number of Doors",
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770735833092",
+        "type": "group",
+        "label": "Typical Door Size",
+        "tooltip": "Observation required.",
+        "subFields": [
+          {
+            "id": "sub_1770735822148",
+            "type": "number",
+            "label": "Height (ft)"
+          },
+          {
+            "id": "sub_1770735832188",
+            "type": "number",
+            "label": "Width (ft)"
+          }
+        ]
+      },
+      {
+        "id": "1770735920532",
+        "type": "number",
+        "label": "Number of Windows",
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770735910421",
+        "type": "group",
+        "label": "Typical Window Size",
+        "tooltip": "Observation required.",
+        "subFields": [
+          {
+            "id": "sub_1770735903388",
+            "type": "number",
+            "label": "Height (ft)"
+          },
+          {
+            "id": "sub_1770735909732",
+            "type": "number",
+            "label": "Width (ft)"
+          }
+        ]
+      },
+      {
+        "id": "1770735980933",
+        "type": "select",
+        "label": "Lintel Type",
+        "options": [
+          "Timber",
+          " Stone",
+          " RCC",
+          " None",
+          " Unknown"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770736006676",
+        "type": "select",
+        "label": "Opening Alignment",
+        "options": [
+          "Aligned",
+          " Staggered",
+          " Irregular"
+        ],
+        "tooltip": "Observation required."
+      }
+    ]
+  },
+  {
+    "id": "1770736025332",
+    "title": "Roof & Floor System",
+    "fields": [
+      {
+        "id": "1770736049429",
+        "type": "select",
+        "label": "Roof Type",
+        "options": [
+          "Flat",
+          " Sloped",
+          " Gable",
+          " Vaulted"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770736106668",
+        "type": "select",
+        "label": "Roof Material",
+        "options": [
+          "Timber + Mud",
+          " RC Slab",
+          " Truss",
+          " Mixed"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770736141797",
+        "type": "select",
+        "label": "Floor Material",
+        "options": [
+          "Earth",
+          " Timber",
+          " RC Slab",
+          " Stone"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770736173116",
+        "type": "select",
+        "label": "Roof-To-Wall Connection",
+        "options": [
+          "Bearing",
+          " Anchored",
+          " Ring Beam"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770736200357",
+        "type": "select",
+        "label": "Floor-To-Wall Connection",
+        "options": [
+          "Integrated",
+          " Placed"
+        ],
+        "tooltip": "Observation required."
+      }
+    ]
+  },
+  {
+    "id": "1770736257332",
+    "title": "Foundation & Plinth",
+    "fields": [
+      {
+        "id": "1770736284932",
+        "type": "select",
+        "label": "Foundation Type",
+        "options": [
+          "Shallow",
+          " Stone Plinth",
+          " RCC",
+          " Unknown"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770736317884",
+        "type": "select",
+        "label": "Foundation Material",
+        "options": [
+          "Rubble Stone",
+          " RCC",
+          " Mixed"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770736354060",
+        "type": "number",
+        "label": "Plinth Height (inches)",
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770736383380",
+        "type": "select",
+        "label": "Damp Proof Course",
+        "options": [
+          "Present",
+          " Absent",
+          " Unknown"
+        ],
+        "tooltip": "Observation required."
+      }
+    ]
+  },
+  {
+    "id": "1770736407844",
+    "title": "Structural Elements & Conditions",
+    "fields": [
+      {
+        "id": "1770736460068",
+        "type": "select",
+        "label": "Buttresses/Arches",
+        "options": [
+          "Present",
+          " Absent"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770736496820",
+        "type": "select",
+        "label": "Timber Bands / Bracing",
+        "options": [
+          "Present",
+          " Absent"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770736522852",
+        "type": "select",
+        "label": "Seismic Retrofitting",
+        "options": [
+          "Yes",
+          " No",
+          " Uncertain"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770736549244",
+        "type": "select",
+        "label": "Overall Condition",
+        "options": [
+          "Good",
+          " Fair",
+          " Poor",
+          " Critical"
+        ],
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770736591324",
+        "type": "multi_select",
+        "label": "Damage Type",
+        "options": [
+          "Vertical Cracks",
+          " Diagonal Cracks",
+          " Settlement",
+          " Separation",
+          " Moisture Damage"
+        ],
+        "tooltip": "Observation required."
+      }
+    ]
+  },
+  {
+    "id": "1770736603348",
+    "title": "Documentation",
+    "fields": [
+      {
+        "id": "1770736622356",
+        "type": "image",
+        "label": "Sketches/Images",
+        "tooltip": "Observation required."
+      },
+      {
+        "id": "1770736681572",
+        "type": "image",
+        "label": "Elevations",
+        "tooltip": "Observation required."
+      }
+    ]
+  },
+  {
+    "id": "1770736711517",
+    "title": "Remarks",
+    "fields": [
+      {
+        "id": "1770736722052",
+        "type": "text",
+        "label": "Remarks",
+        "tooltip": "Observation required."
+      }
+    ]
+  }
+]
