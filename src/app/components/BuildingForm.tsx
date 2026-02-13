@@ -277,6 +277,18 @@ export default function BuildingForm() {
   const [adminTab, setAdminTab] = useState<'schema' | 'logic' | 'preview' | 'access'>('schema');
   const [draggedFieldId, setDraggedFieldId] = useState<string | null>(null);
 
+  // NEW: Autosave, Dark Mode, Filters, Audit Log
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'complete' | 'incomplete'>('all');
+  const [auditLog, setAuditLog] = useState<Array<{id: string; fieldLabel: string; oldValue: any; newValue: any; timestamp: Date; userId: string}>>([]);
+  const [showAuditLog, setShowAuditLog] = useState(false);
+  const [batchSelectedReports, setBatchSelectedReports] = useState<Set<string>>(new Set());
+  const [showQualityIndicator, setShowQualityIndicator] = useState(true);
+
   const checkPending = async () => {
     if (localDB && localDB.outbox) {
       setPendingCount(await localDB.outbox.count());
@@ -337,6 +349,164 @@ export default function BuildingForm() {
     const { outcome } = await installPrompt.userChoice;
     if (outcome === 'accepted') setInstallPrompt(null);
   };
+
+  // NEW: Autosave Effect (every 30 seconds)
+  useEffect(() => {
+    if (Object.keys(formData).length === 0) return;
+    const timer = setInterval(() => {
+      localStorage.setItem('formDataDraft', JSON.stringify(formData));
+      setLastSaved(new Date());
+      setUnsavedChanges(false);
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [formData]);
+
+  // NEW: Load autosaved draft on mount
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('formDataDraft');
+    if (savedDraft) {
+      try {
+        setFormData(JSON.parse(savedDraft));
+      } catch (e) {
+        console.error('Failed to load draft');
+      }
+    }
+  }, []);
+
+  // NEW: Track form data changes to mark as unsaved
+  useEffect(() => {
+    if (Object.keys(formData).length > 0) {
+      setUnsavedChanges(true);
+    }
+  }, [formData]);
+
+  // NEW: Dark mode effect
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('darkMode', 'true');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('darkMode', 'false');
+    }
+  }, [darkMode]);
+
+  // NEW: Load dark mode preference
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    setDarkMode(savedDarkMode);
+  }, []);
+
+  // NEW: Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 's') {
+          e.preventDefault();
+          submitReport();
+        }
+        if (e.key === 'k') {
+          e.preventDefault();
+          setSearchQuery('');
+        }
+      }
+      if (e.key === 'Escape') {
+        setEditingReport(null);
+        setViewingImages(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [formData]);
+
+  // NEW: Calculate quality indicator
+  const calculateQualityScore = (report: BuildingReport): { score: number; status: 'complete' | 'incomplete' | 'partial' } => {
+    const data = report.full_data;
+    let filled = 0;
+    let total = 0;
+    
+    sections.forEach(sec => {
+      sec.fields.forEach(f => {
+        total++;
+        const val = data[f.label];
+        if (val !== undefined && val !== null && val !== '') {
+          if (Array.isArray(val) && val.length > 0) filled++;
+          else if (!Array.isArray(val)) filled++;
+        }
+      });
+    });
+    
+    const score = total === 0 ? 0 : Math.round((filled / total) * 100);
+    return {
+      score,
+      status: score === 100 ? 'complete' : score >= 50 ? 'partial' : 'incomplete'
+    };
+  };
+
+  // NEW: Add audit log entry
+  const addAuditLogEntry = (fieldLabel: string, oldValue: any, newValue: any) => {
+    setAuditLog(prev => [...prev, {
+      id: Date.now().toString(),
+      fieldLabel,
+      oldValue,
+      newValue,
+      timestamp: new Date(),
+      userId: 'current_user'
+    }]);
+  };
+
+  // NEW: Check for missing required fields
+  const validateRequiredFields = (): string[] => {
+    const missing: string[] = [];
+    sections.forEach(sec => {
+      sec.fields.forEach(f => {
+        if (f.required) {
+          const val = formData[f.label];
+          if (!val || (Array.isArray(val) && val.length === 0) || val === '') {
+            missing.push(`${f.label} (${sec.title})`);
+          }
+        }
+      });
+    });
+    return missing;
+  };
+
+  // NEW: Filter reports logic
+  const getFilteredReports = () => {
+    let filtered = reports;
+    
+    if (searchQuery) {
+      filtered = filtered.filter(r => r.building_id.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    
+    if (filterDateFrom) {
+      const fromDate = new Date(filterDateFrom);
+      filtered = filtered.filter(r => new Date(r.created_at) >= fromDate);
+    }
+    
+    if (filterDateTo) {
+      const toDate = new Date(filterDateTo);
+      toDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(r => new Date(r.created_at) <= toDate);
+    }
+    
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(r => {
+        const quality = calculateQualityScore(r);
+        return filterStatus === 'complete' ? quality.status === 'complete' : quality.status !== 'complete';
+      });
+    }
+    
+    return filtered;
+  };
+
+  // NEW: Batch export selected reports
+  const batchExportSelected = async () => {
+    if (batchSelectedReports.size === 0) return alert('Select reports first');
+    const selectedReportsData = reports.filter(r => batchSelectedReports.has(r.id));
+    await exportToExcel(selectedReportsData);
+    setBatchSelectedReports(new Set());
+  };
   
   const runSync = async () => {
     if (!isOnline || syncing) return;
@@ -373,14 +543,22 @@ export default function BuildingForm() {
 
   const submitReport = async () => {
     if (!formData['Building ID']) return alert("Critical: Building ID Required.");
+    
+    // NEW: Validate required fields
+    const missingFields = validateRequiredFields();
+    if (missingFields.length > 0) {
+      const fieldList = missingFields.join('\n• ');
+      return alert(`⚠️ Missing Required Fields:\n• ${fieldList}\n\nPlease fill these before submitting.`);
+    }
+
     const entry = { building_id: formData['Building ID'], full_data: formData, timestamp: Date.now() };
     if (isOnline) {
       try {
           const { error } = await supabase.from('building_reports').insert([{ building_id: entry.building_id, full_data: entry.full_data }]);
-          if (!error) { alert("Packet Uploaded!"); setFormData({}); loadReports(); } else { throw new Error("DB Error"); }
-      } catch (e) { await localDB.outbox.add(entry); await checkPending(); alert("Connection unstable. Saved Locally."); setFormData({}); }
+          if (!error) { alert("✅ Packet Uploaded!"); localStorage.removeItem('formDataDraft'); setFormData({}); setUnsavedChanges(false); loadReports(); } else { throw new Error("DB Error"); }
+      } catch (e) { await localDB.outbox.add(entry); await checkPending(); alert("⚠️ Connection unstable. Saved Locally."); setFormData({}); setUnsavedChanges(false); }
     } else {
-      await localDB.outbox.add(entry); await checkPending(); alert("Offline Mode: Saved to Vault."); setFormData({});
+      await localDB.outbox.add(entry); await checkPending(); alert("📦 Offline Mode: Saved to Vault."); setFormData({}); setUnsavedChanges(false);
     }
   };
 
@@ -707,8 +885,15 @@ export default function BuildingForm() {
       </div>
 
       <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-        {!isAdmin && <button onClick={() => exportToExcel()} className="text-[10px] font-black bg-white px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-[#001F3F] hover:text-[#39CCCC] transition-colors flex items-center gap-2"><FileDown size={14} /> EXCEL</button>}
-        <button onClick={() => isAdmin ? setIsAdmin(false) : setShowAdminPanel(!showAdminPanel)} className="text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-wider">{isAdmin ? 'Exit Admin' : 'Admin'}</button>
+        <div className="flex items-center gap-3">
+          {!isAdmin && <button onClick={() => exportToExcel()} className="text-[10px] font-black bg-white px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-[#001F3F] hover:text-[#39CCCC] transition-colors flex items-center gap-2"><FileDown size={14} /> EXCEL</button>}
+          {unsavedChanges && <span className="text-[10px] font-black text-orange-600">💾 Unsaved Changes</span>}
+          {lastSaved && <span className="text-[9px] text-slate-500">Last saved: {lastSaved.toLocaleTimeString()}</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setDarkMode(!darkMode)} title="Toggle Dark Mode" className="text-[10px] font-black px-2 py-1 rounded bg-slate-100 hover:bg-slate-200">{darkMode ? '☀️' : '🌙'}</button>
+          <button onClick={() => isAdmin ? setIsAdmin(false) : setShowAdminPanel(!showAdminPanel)} className="text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-wider">{isAdmin ? 'Exit Admin' : 'Admin'}</button>
+        </div>
       </div>
 
       {showAdminPanel && !isAdmin && (
@@ -739,23 +924,78 @@ export default function BuildingForm() {
           {/* Data Records Panel */}
           <div className="bg-white p-6 rounded-3xl border-2 border-[#001F3F] shadow-xl space-y-4">
              <div className="flex justify-between items-center border-b pb-3">
-                 <h3 className="font-black text-[#001F3F] text-xs">DATA RECORDS ({reports.length})</h3>
-                 <div className="flex gap-2">{selectedRows.size > 0 && <button onClick={deleteSelected} className="bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded">PURGE ({selectedRows.size})</button>}</div>
+                 <h3 className="font-black text-[#001F3F] text-xs">📊 DATA RECORDS ({getFilteredReports().length})</h3>
+                 <div className="flex gap-2">
+                   {batchSelectedReports.size > 0 && (
+                     <>
+                       <button onClick={batchExportSelected} className="bg-green-600 text-white text-[10px] font-bold px-3 py-1 rounded">📥 EXPORT {batchSelectedReports.size}</button>
+                       <button onClick={deleteSelected} className="bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded">🗑️ PURGE ({batchSelectedReports.size})</button>
+                     </>
+                   )}
+                   <button onClick={() => setShowAuditLog(!showAuditLog)} className="bg-blue-600 text-white text-[10px] font-bold px-3 py-1 rounded">📋 AUDIT LOG</button>
+                 </div>
              </div>
-             <input type="text" placeholder="Search..." className="w-full p-2 bg-slate-50 border rounded-lg text-xs text-black" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-             <div className="max-h-60 overflow-y-auto">
-                 {paginatedReports.map(r => (
-                     <div key={r.id} className="flex justify-between items-center p-3 border-b text-xs">
-                         <span className="font-bold text-black">{r.building_id}</span>
+
+             {/* Filters */}
+             <div className="bg-slate-50 p-4 rounded-lg space-y-3 border border-slate-200">
+               <p className="text-[10px] font-bold text-slate-700">🔍 FILTERS</p>
+               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                 <input type="text" placeholder="Search ID..." className="p-2 bg-white border rounded-lg text-xs text-black" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                 <input type="date" className="p-2 bg-white border rounded-lg text-xs text-black" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} />
+                 <input type="date" className="p-2 bg-white border rounded-lg text-xs text-black" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} />
+                 <select className="p-2 bg-white border rounded-lg text-xs text-black" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}>
+                   <option value="all">All Status</option>
+                   <option value="complete">✅ Complete</option>
+                   <option value="incomplete">❌ Incomplete</option>
+                 </select>
+               </div>
+             </div>
+
+             <div className="max-h-96 overflow-y-auto">
+                 {getFilteredReports().length === 0 ? <p className="text-xs text-slate-500 p-4">No records found</p> : getFilteredReports().map(r => {
+                   const quality = calculateQualityScore(r);
+                   const qualityColor = quality.status === 'complete' ? 'bg-green-50' : quality.status === 'partial' ? 'bg-yellow-50' : 'bg-red-50';
+                   const qualityIcon = quality.status === 'complete' ? '✅' : quality.status === 'partial' ? '🟡' : '❌';
+                   return (
+                     <div key={r.id} className={`flex justify-between items-center p-3 border-b text-xs ${qualityColor}`}>
+                         <div className="flex-1">
+                           <div className="flex items-center gap-2">
+                             <span className="font-bold text-black">{r.building_id}</span>
+                             <span className="text-[10px] text-slate-600">{new Date(r.created_at).toLocaleDateString()}</span>
+                           </div>
+                           <div className="text-[9px] text-slate-600 mt-1">{qualityIcon} {quality.score}% Complete</div>
+                         </div>
                          <div className="flex gap-2">
                              <button onClick={() => setViewingImages(Object.values(r.full_data).flatMap(v => (Array.isArray(v) && v[0]?.url) ? v : []))} className="text-[#001F3F]"><Eye size={14}/></button>
                              <button onClick={() => setEditingReport(r)} className="text-[#001F3F]"><Edit3 size={14}/></button>
-                             <input type="checkbox" checked={selectedRows.has(r.id)} onChange={() => { const n = new Set(selectedRows); n.has(r.id) ? n.delete(r.id) : n.add(r.id); setSelectedRows(n); }} />
+                             <input type="checkbox" checked={batchSelectedReports.has(r.id)} onChange={() => { const n = new Set(batchSelectedReports); n.has(r.id) ? n.delete(r.id) : n.add(r.id); setBatchSelectedReports(n); }} />
                          </div>
                      </div>
-                 ))}
+                   );
+                 })}
              </div>
           </div>
+
+          {/* Audit Log Modal */}
+          {showAuditLog && (
+            <div className="bg-white p-6 rounded-3xl border-2 border-[#001F3F] shadow-xl max-h-80 overflow-y-auto">
+              <div className="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 className="font-black text-[#001F3F] text-xs">📋 FIELD HISTORY & AUDIT LOG</h3>
+                <button onClick={() => setShowAuditLog(false)} className="text-slate-400 hover:text-slate-600"><X size={16}/></button>
+              </div>
+              {auditLog.length === 0 ? (
+                <p className="text-xs text-slate-500">No changes recorded yet</p>
+              ) : (
+                auditLog.map(entry => (
+                  <div key={entry.id} className="text-[9px] border-b py-2 mb-2">
+                    <p className="font-bold text-[#001F3F]">{entry.fieldLabel}</p>
+                    <p className="text-slate-600">Changed: {entry.timestamp.toLocaleString()}</p>
+                    <p className="text-slate-500">By: {entry.userId}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
 
           {/* TAB 1: SCHEMA */}
           {adminTab === 'schema' && (
@@ -1032,6 +1272,12 @@ export default function BuildingForm() {
 
       {!isAdmin && (
         <>
+          {/* Keyboard Shortcuts Help */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-[9px]">
+            <p className="font-bold text-blue-900 mb-2">⌨️ Keyboard Shortcuts:</p>
+            <p className="text-blue-800"><kbd className="bg-white border rounded px-1">Ctrl+S</kbd> Submit Form | <kbd className="bg-white border rounded px-1">Escape</kbd> Close Modals</p>
+          </div>
+
           {/* NEW: Download for Offline Use Button UI */}
           {installPrompt && (
             <div className="flex justify-center mb-4">
@@ -1048,6 +1294,14 @@ export default function BuildingForm() {
             <CheckSquare size={18} /> {isOnline ? 'SUBMIT PROFORMA' : 'SAVE LOCALLY'}
           </button>
         </>
+      )}
+
+      {/* Dark Mode Styles */}
+      {darkMode && (
+        <style>{`
+          body { @apply bg-slate-900 text-white; }
+          input, select, textarea { @apply bg-slate-800 text-white border-slate-600; }
+        `}</style>
       )}
 
       {viewingImages && (
