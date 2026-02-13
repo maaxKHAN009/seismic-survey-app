@@ -47,9 +47,13 @@ interface CustomField {
   required?: boolean;
   dependsOn?: {
     fieldId: string;
-    triggerValues: string[];
+    conditionType: 'equals' | 'notCaptured' | 'countGreaterThan' | 'isEmpty';
+    triggerValues?: string[];
+    triggerCount?: number;
   };
 }
+
+type UserRole = 'viewer' | 'collector' | 'editor' | 'admin';
 
 interface Section {
   id: string;
@@ -265,6 +269,14 @@ export default function BuildingForm() {
   const [dependsOnFieldId, setDependsOnFieldId] = useState('');
   const [dependsOnTriggerValues, setDependsOnTriggerValues] = useState<string[]>([]);
 
+  const [dependsOnConditionType, setDependsOnConditionType] = useState<'equals' | 'notCaptured' | 'countGreaterThan' | 'isEmpty'>('equals');
+  const [dependsOnTriggerCount, setDependsOnTriggerCount] = useState<number>(0);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [userRole, setUserRole] = useState<UserRole>('admin');
+  const [showExportImport, setShowExportImport] = useState(false);
+  const [adminTab, setAdminTab] = useState<'schema' | 'logic' | 'preview' | 'access'>('schema');
+  const [draggedFieldId, setDraggedFieldId] = useState<string | null>(null);
+
   const checkPending = async () => {
     if (localDB && localDB.outbox) {
       setPendingCount(await localDB.outbox.count());
@@ -445,12 +457,18 @@ export default function BuildingForm() {
       tooltip: newFieldTooltip || 'Observation required.',
       options: (newFieldType === 'select' || newFieldType === 'multi_select') ? newOptions.filter(o => o.trim() !== '') : undefined,
       subFields: newFieldType === 'group' ? tempSubFields : undefined,
-      dependsOn: dependsOnFieldId ? { fieldId: dependsOnFieldId, triggerValues: dependsOnTriggerValues } : undefined
+      required: false,
+      dependsOn: dependsOnFieldId ? { 
+        fieldId: dependsOnFieldId, 
+        conditionType: dependsOnConditionType,
+        triggerValues: dependsOnConditionType === 'equals' ? dependsOnTriggerValues : undefined,
+        triggerCount: dependsOnConditionType === 'countGreaterThan' ? dependsOnTriggerCount : undefined
+      } : undefined
     };
     const updatedSections = sections.map(sec => sec.id === targetSectionId ? { ...sec, fields: [...sec.fields, newField] } : sec);
     await updateSchema(updatedSections);
     setNewFieldLabel(''); setNewOptions(['']); setTempSubFields([]);
-    setDependsOnFieldId(''); setDependsOnTriggerValues([]);
+    setDependsOnFieldId(''); setDependsOnTriggerValues([]); setDependsOnTriggerCount(0); setDependsOnConditionType('equals');
   };
 
   const removeField = async (sectionId: string, fieldId: string) => {
@@ -588,6 +606,62 @@ export default function BuildingForm() {
     saveAs(blob, `UET_EPFL_Report_${Date.now()}.xlsx`);
   };
 
+  const exportSchema = () => {
+    const dataStr = JSON.stringify(sections, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `schema_${Date.now()}.json`;
+    link.click();
+  };
+
+  const importSchema = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const imported = JSON.parse(e.target?.result as string) as Section[];
+        await updateSchema(imported);
+        alert('Schema imported successfully!');
+      } catch (err) {
+        alert('Error importing schema. Check file format.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const toggleFieldRequired = async (sectionId: string, fieldId: string) => {
+    const updatedSections = sections.map(sec => {
+      if (sec.id === sectionId) {
+        return {
+          ...sec,
+          fields: sec.fields.map(f => f.id === fieldId ? { ...f, required: !f.required } : f)
+        };
+      }
+      return sec;
+    });
+    await updateSchema(updatedSections);
+  };
+
+  const moveFieldBetweenSections = async (fromSectionId: string, toSectionId: string, fieldIndex: number) => {
+    const fromSection = sections.find(s => s.id === fromSectionId);
+    if (!fromSection || fieldIndex < 0 || fieldIndex >= fromSection.fields.length) return;
+    
+    const fieldToMove = fromSection.fields[fieldIndex];
+    const updatedSections = sections.map(sec => {
+      if (sec.id === fromSectionId) {
+        return { ...sec, fields: sec.fields.filter((_, idx) => idx !== fieldIndex) };
+      }
+      if (sec.id === toSectionId) {
+        return { ...sec, fields: [...sec.fields, fieldToMove] };
+      }
+      return sec;
+    });
+    await updateSchema(updatedSections);
+  };
+
   const filteredReports = reports.filter(r => r.building_id.toLowerCase().includes(searchQuery.toLowerCase()));
   const paginatedReports = filteredReports.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
@@ -596,8 +670,20 @@ export default function BuildingForm() {
     const parentField = sections.flatMap(s => s.fields).find(f => f.id === field.dependsOn?.fieldId);
     if (!parentField) return true;
     const parentValue = formData[parentField.label];
-    if (!parentValue) return false;
-    return field.dependsOn.triggerValues.includes(String(parentValue));
+    
+    switch (field.dependsOn.conditionType) {
+      case 'equals':
+        return field.dependsOn.triggerValues ? field.dependsOn.triggerValues.includes(String(parentValue)) : false;
+      case 'notCaptured':
+        return !parentValue || (Array.isArray(parentValue) && parentValue.length === 0);
+      case 'isEmpty':
+        return !parentValue || String(parentValue).trim() === '';
+      case 'countGreaterThan':
+        if (Array.isArray(parentValue)) return parentValue.length > (field.dependsOn.triggerCount || 0);
+        return false;
+      default:
+        return true;
+    }
   };
 
   return (
@@ -635,12 +721,26 @@ export default function BuildingForm() {
       {/* ADMIN DASHBOARD */}
       {isAdmin && (
         <div className="space-y-6 animate-in slide-in-from-top-4">
+          {/* Tab Navigation */}
+          <div className="flex gap-2 bg-white p-3 rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+            <button onClick={() => setAdminTab('schema')} className={`px-4 py-2 rounded-lg text-xs font-black uppercase whitespace-nowrap transition-all ${adminTab === 'schema' ? 'bg-[#001F3F] text-[#39CCCC]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>📋 Schema</button>
+            <button onClick={() => setAdminTab('logic')} className={`px-4 py-2 rounded-lg text-xs font-black uppercase whitespace-nowrap transition-all ${adminTab === 'logic' ? 'bg-[#001F3F] text-[#39CCCC]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>⚙️ Logic</button>
+            <button onClick={() => setAdminTab('preview')} className={`px-4 py-2 rounded-lg text-xs font-black uppercase whitespace-nowrap transition-all ${adminTab === 'preview' ? 'bg-[#001F3F] text-[#39CCCC]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>👁️ Preview</button>
+            <button onClick={() => setAdminTab('access')} className={`px-4 py-2 rounded-lg text-xs font-black uppercase whitespace-nowrap transition-all ${adminTab === 'access' ? 'bg-[#001F3F] text-[#39CCCC]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>👥 Access</button>
+            <div className="ml-auto flex gap-2">
+              <button onClick={exportSchema} className="px-3 py-2 rounded-lg text-xs font-black bg-green-100 text-green-700 hover:bg-green-200"><FileDown size={12} /></button>
+              <label className="px-3 py-2 rounded-lg text-xs font-black bg-blue-100 text-blue-700 hover:bg-blue-200 cursor-pointer">
+                📂 Import
+                <input type="file" accept=".json" onChange={importSchema} className="hidden" />
+              </label>
+            </div>
+          </div>
+
+          {/* Data Records Panel */}
           <div className="bg-white p-6 rounded-3xl border-2 border-[#001F3F] shadow-xl space-y-4">
              <div className="flex justify-between items-center border-b pb-3">
-                 <h3 className="font-black text-[#001F3F] text-xs">DATA RECORDS</h3>
-                 <div className="flex gap-2">
-                     <button onClick={deleteSelected} className="bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded">PURGE ({selectedRows.size})</button>
-                 </div>
+                 <h3 className="font-black text-[#001F3F] text-xs">DATA RECORDS ({reports.length})</h3>
+                 <div className="flex gap-2">{selectedRows.size > 0 && <button onClick={deleteSelected} className="bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded">PURGE ({selectedRows.size})</button>}</div>
              </div>
              <input type="text" placeholder="Search..." className="w-full p-2 bg-slate-50 border rounded-lg text-xs text-black" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
              <div className="max-h-60 overflow-y-auto">
@@ -657,33 +757,54 @@ export default function BuildingForm() {
              </div>
           </div>
 
-          <div className="bg-[#001F3F] p-6 rounded-3xl text-white space-y-6 shadow-lg">
-            <h3 className="text-xs font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">1. Create Section</h3>
-            <div className="flex gap-2">
-                <input type="text" placeholder="Section Name" className="flex-1 p-3 bg-white/10 rounded-xl text-xs font-bold border border-white/10 text-white" value={newSectionTitle} onChange={(e) => setNewSectionTitle(e.target.value)} />
-                <button onClick={addSection} className="bg-[#39CCCC] text-[#001F3F] px-4 rounded-xl font-black text-xs">ADD</button>
+          {/* TAB 1: SCHEMA */}
+          {adminTab === 'schema' && (
+            <div className="bg-[#001F3F] p-6 rounded-3xl text-white space-y-6 shadow-lg">
+              <h3 className="text-xs font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">📝 Manage Sections</h3>
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input type="text" placeholder="New Section Name" className="flex-1 p-3 bg-white/10 rounded-xl text-xs font-bold border border-white/10 text-white" value={newSectionTitle} onChange={(e) => setNewSectionTitle(e.target.value)} />
+                  <button onClick={addSection} className="bg-[#39CCCC] text-[#001F3F] px-6 rounded-xl font-black text-xs">+ ADD</button>
+                </div>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {sections.map((sec, idx) => (
+                    <div key={sec.id} className="bg-white/10 p-3 rounded-lg flex justify-between items-center">
+                      <span className="text-xs font-bold">{sec.title}</span>
+                      <div className="flex gap-2">
+                        <button onClick={() => moveSection(idx, 'up')} disabled={idx === 0} className="text-gray-300 hover:text-[#39CCCC] disabled:opacity-30"><ArrowUp size={14}/></button>
+                        <button onClick={() => moveSection(idx, 'down')} disabled={idx === sections.length - 1} className="text-gray-300 hover:text-[#39CCCC] disabled:opacity-30"><ArrowDown size={14}/></button>
+                        <button onClick={() => renameSection(sec.id)} className="text-blue-300 hover:text-[#39CCCC]"><PenTool size={14}/></button>
+                        <button onClick={() => removeSection(sec.id)} className="text-red-300 hover:text-red-500"><Trash2 size={14} /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
+          )}
 
-            <h3 className="text-xs font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">2. Add Field to Section</h3>
-            <div className="space-y-3">
-                <select className="w-full p-3 bg-white rounded-xl text-xs font-bold border border-white/10 text-black" value={targetSectionId} onChange={(e) => setTargetSectionId(e.target.value)}>
+          {/* TAB 2: LOGIC */}
+          {adminTab === 'logic' && (
+            <div className="bg-[#001F3F] p-6 rounded-3xl text-white space-y-6 shadow-lg">
+              <h3 className="text-xs font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">⚙️ Add Field with Logic</h3>
+              <div className="space-y-4">
+                <select className="w-full p-3 bg-white rounded-xl text-xs font-bold text-black" value={targetSectionId} onChange={(e) => setTargetSectionId(e.target.value)}>
                     <option value="">Select Target Section...</option>
                     {sections.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                 </select>
 
                 <div className="grid grid-cols-2 gap-3">
                     <input type="text" placeholder="Field Label" className="p-3 bg-white/10 rounded-xl text-xs font-bold border border-white/10 text-white" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
-                    <select className="p-3 bg-white rounded-xl text-xs font-bold border border-white/10 text-black" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
+                    <select className="p-3 bg-white rounded-xl text-xs font-bold text-black" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
                         <option value="text">Text</option><option value="number">Number</option><option value="select">Dropdown</option><option value="multi_select">Multi-Select</option>
                         <option value="checkbox">Check</option><option value="image">Photo</option><option value="gps">GPS</option>
                         <option value="group">Group (Sub-fields)</option><option value="dynamic_series">Dynamic Series</option>
                     </select>
                 </div>
+                <input type="text" placeholder="Tooltip/Guidance" className="w-full p-3 bg-white/10 rounded-xl text-xs font-bold border border-white/10 text-white" value={newFieldTooltip} onChange={(e) => setNewFieldTooltip(e.target.value)} />
 
                 {(newFieldType === 'select' || newFieldType === 'multi_select') && (
-                  <div className="flex gap-2">
-                      <input type="text" placeholder="Options (comma separated)" className="flex-1 p-3 bg-white/10 rounded-xl text-xs text-white" value={newOptions.join(',')} onChange={(e) => setNewOptions(e.target.value.split(','))} />
-                  </div>
+                  <input type="text" placeholder="Options (comma separated)" className="w-full p-3 bg-white/10 rounded-xl text-xs text-white" value={newOptions.join(',')} onChange={(e) => setNewOptions(e.target.value.split(',').map(o => o.trim()).filter(o => o))} />
                 )}
 
                 {newFieldType === 'group' && (
@@ -695,14 +816,14 @@ export default function BuildingForm() {
                              <option value="text">Text</option><option value="number">Number</option><option value="select">Select</option><option value="checkbox">Check</option>
                           </select>
                        </div>
-                       {newSubType === 'select' && <input type="text" placeholder="Options (comma sep)" className="w-full p-2 bg-white/10 text-white text-xs rounded" value={newSubOptions.join(',')} onChange={(e) => setNewSubOptions(e.target.value.split(','))} />}
+                       {newSubType === 'select' && <input type="text" placeholder="Options (comma sep)" className="w-full p-2 bg-white/10 text-white text-xs rounded" value={newSubOptions.join(',')} onChange={(e) => setNewSubOptions(e.target.value.split(',').map(o => o.trim()).filter(o => o))} />}
                        <button onClick={pushSubField} className="w-full bg-[#85144B] text-white text-[10px] p-2 rounded font-bold">+ Add Sub-Field</button>
                        <div className="space-y-1 mt-2">{tempSubFields.map(sf => (<div key={sf.id} className="flex justify-between text-[10px] bg-white/5 p-1 rounded px-2"><span>{sf.label} ({sf.type})</span><button className="text-red-400" onClick={() => setTempSubFields(tempSubFields.filter(t => t.id !== sf.id))}>x</button></div>))}</div>
                    </div>
                 )}
 
                 <div className="bg-black/20 p-3 rounded-xl space-y-2">
-                    <p className="text-[10px] text-[#39CCCC] font-bold">Configure Conditional Display (Optional)</p>
+                    <p className="text-[10px] text-[#39CCCC] font-bold">✨ Conditional Display (Optional)</p>
                     <select className="w-full p-2 bg-white text-black text-xs rounded" value={dependsOnFieldId} onChange={(e) => setDependsOnFieldId(e.target.value)}>
                         <option value="">No Dependency</option>
                         {sections.flatMap(sec => sec.fields).map(field => (
@@ -710,17 +831,101 @@ export default function BuildingForm() {
                         ))}
                     </select>
                     {dependsOnFieldId && (
-                        <div>
-                            <p className="text-[9px] text-white mb-1">Show this field when parent field equals:</p>
-                            <input type="text" placeholder="Trigger values (comma sep)" className="w-full p-2 bg-white/10 text-white text-xs rounded" value={dependsOnTriggerValues.join(', ')} onChange={(e) => setDependsOnTriggerValues(e.target.value.split(',').map(v => v.trim()).filter(v => v))} />
-                            <p className="text-[8px] text-gray-300 mt-1">E.g., if parent field is "Building Material", enter: RCC, Wooden</p>
+                        <div className="space-y-2">
+                          <select className="w-full p-2 bg-white text-black text-xs rounded" value={dependsOnConditionType} onChange={(e) => setDependsOnConditionType(e.target.value as any)}>
+                            <option value="equals">Equals (visual picker)</option>
+                            <option value="notCaptured">Not Captured</option>
+                            <option value="isEmpty">Is Empty</option>
+                            <option value="countGreaterThan">Count Greater Than</option>
+                          </select>
+
+                          {dependsOnConditionType === 'equals' && (
+                            <div className="bg-white/5 p-2 rounded space-y-2">
+                              <p className="text-[9px] text-white">Select values to trigger:</p>
+                              {(() => {
+                                const parentField = sections.flatMap(s => s.fields).find(f => f.id === dependsOnFieldId);
+                                return parentField?.options?.map(opt => (
+                                  <label key={opt} className="flex items-center gap-2 text-[9px] text-white">
+                                    <input type="checkbox" checked={dependsOnTriggerValues.includes(opt)} onChange={(e) => {
+                                      if (e.target.checked) setDependsOnTriggerValues([...dependsOnTriggerValues, opt]);
+                                      else setDependsOnTriggerValues(dependsOnTriggerValues.filter(v => v !== opt));
+                                    }} className="accent-[#39CCCC]" />
+                                    {opt}
+                                  </label>
+                                ));
+                              })()}
+                            </div>
+                          )}
+
+                          {dependsOnConditionType === 'countGreaterThan' && (
+                            <input type="number" placeholder="Minimum count" min="0" className="w-full p-2 bg-white text-black text-xs rounded" value={dependsOnTriggerCount} onChange={(e) => setDependsOnTriggerCount(parseInt(e.target.value) || 0)} />
+                          )}
                         </div>
                     )}
                 </div>
 
-                <button onClick={addField} disabled={!targetSectionId} className="w-full bg-[#39CCCC] text-[#001F3F] p-3 rounded-xl font-black text-xs uppercase tracking-widest mt-2 disabled:opacity-50">DEPLOY FIELD</button>
+                <button onClick={addField} disabled={!targetSectionId} className="w-full bg-[#39CCCC] text-[#001F3F] p-3 rounded-xl font-black text-xs uppercase tracking-widest disabled:opacity-50">🚀 DEPLOY FIELD</button>
             </div>
-          </div>
+            </div>
+          )}
+
+          {/* TAB 3: PREVIEW */}
+          {adminTab === 'preview' && (
+            <div className="bg-white p-6 rounded-3xl border-2 border-[#001F3F] shadow-xl space-y-4">
+              <h3 className="text-xs font-black uppercase text-[#001F3F]">👁️ Live Form Preview</h3>
+              <p className="text-[10px] text-slate-600">Changes appear here instantly:</p>
+              <div className="bg-[#F5F5F5] p-4 rounded-xl border-2 border-dashed border-slate-300 max-h-96 overflow-y-auto">
+                {sections.length === 0 ? (
+                  <p className="text-xs text-slate-500">No sections yet. Create one in the Schema tab.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {sections.map((section) => (
+                      <div key={section.id} className="space-y-3">
+                        <h4 className="text-xs font-black text-[#001F3F] uppercase border-b pb-2">{section.title}</h4>
+                        <div className="space-y-2">
+                          {section.fields.length === 0 ? (
+                            <p className="text-[9px] text-slate-500">No fields in this section</p>
+                          ) : (
+                            section.fields.map((f) => (
+                              <div key={f.id} className="bg-white p-3 rounded-lg border border-slate-200 text-[9px]">
+                                <p className="font-bold"><span className="text-[#001F3F]">{f.label}</span> {f.required && <span className="text-red-500 ml-1">*</span>} <span className="text-[7px] bg-slate-100 px-1 rounded text-slate-600">{f.type}</span></p>
+                                {f.dependsOn && <p className="text-[8px] text-blue-600 mt-1">⚡ Shown when parent field triggers</p>}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: ACCESS CONTROL */}
+          {adminTab === 'access' && (
+            <div className="bg-[#001F3F] p-6 rounded-3xl text-white space-y-6 shadow-lg">
+              <h3 className="text-xs font-black uppercase text-[#39CCCC] border-b border-white/20 pb-2">👥 Role-Based Access</h3>
+              <div className="space-y-4">
+                <div className="bg-black/20 p-4 rounded-xl">
+                  <p className="text-xs font-bold mb-3">Current Role: <span className="text-[#39CCCC]">{userRole.toUpperCase()}</span></p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['viewer', 'collector', 'editor', 'admin'] as const).map(role => (
+                      <button key={role} onClick={() => setUserRole(role)} className={`p-2 rounded-lg text-xs font-bold uppercase transition-all ${userRole === role ? 'bg-[#39CCCC] text-[#001F3F]' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+                        {role}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-3 text-[9px]">
+                  <div className="bg-white/5 p-3 rounded-lg"><p className="font-bold text-[#39CCCC]">📱 Viewer</p><p>View reports only, no editing</p></div>
+                  <div className="bg-white/5 p-3 rounded-lg"><p className="font-bold text-[#39CCCC]">✏️ Collector</p><p>Fill forms & view pending data</p></div>
+                  <div className="bg-white/5 p-3 rounded-lg"><p className="font-bold text-[#39CCCC]">✏️ Editor</p><p>Edit submitted data</p></div>
+                  <div className="bg-white/5 p-3 rounded-lg"><p className="font-bold text-[#39CCCC]">⚙️ Admin</p><p>Full access: schema, data, users</p></div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -752,6 +957,7 @@ export default function BuildingForm() {
                                 </label>
                                 {isAdmin && (
                                     <div className="flex gap-2">
+                                        <button onClick={() => toggleFieldRequired(section.id, f.id)} title={f.required ? 'Remove Required' : 'Mark Required'} className={`transition-colors p-1 ${f.required ? 'text-red-500 bg-red-50 rounded' : 'text-slate-300 hover:text-orange-500'}`}><CheckSquare size={14}/></button>
                                         <button onClick={() => moveField(section.id, fIdx, 'up')} className="text-slate-300 hover:text-blue-500"><ArrowUp size={14}/></button>
                                         <button onClick={() => moveField(section.id, fIdx, 'down')} className="text-slate-300 hover:text-blue-500"><ArrowDown size={14}/></button>
                                         <button onClick={() => removeField(section.id, f.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button>
