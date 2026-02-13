@@ -71,7 +71,6 @@ interface BuildingReport {
   full_data: Record<string, any>; 
 }
 
-// --- CONSTANTS ---
 const DEFAULT_SECTIONS: Section[] = [
   {
     id: 'sec_ident', title: '1. Identification',
@@ -241,7 +240,6 @@ export default function BuildingForm() {
   const [reports, setReports] = useState<BuildingReport[]>([]);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterDistrict, setFilterDistrict] = useState('All');
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [editingReport, setEditingReport] = useState<BuildingReport | null>(null);
   const [viewingImages, setViewingImages] = useState<ImageObject[] | null>(null);
@@ -260,7 +258,6 @@ export default function BuildingForm() {
   const [newSubType, setNewSubType] = useState<SubFieldType>('text');
   const [newSubOptions, setNewSubOptions] = useState<string[]>(['']);
 
-  // Functions for Initial Loads
   const checkPending = async () => {
     if (localDB && localDB.outbox) {
       setPendingCount(await localDB.outbox.count());
@@ -307,7 +304,6 @@ export default function BuildingForm() {
     };
     window.addEventListener('beforeinstallprompt', handlePrompt);
 
-    // Service Worker Registration
     if ('serviceWorker' in navigator) {
       const handleServiceWorker = async () => {
         try {
@@ -335,7 +331,6 @@ export default function BuildingForm() {
     if (outcome === 'accepted') setInstallPrompt(null);
   };
   
-  // --- SYNC ENGINE ---
   const runSync = async () => {
     if (!isOnline || syncing) return;
     setSyncing(true);
@@ -413,7 +408,6 @@ export default function BuildingForm() {
     );
   };
 
-  // --- ADMIN: SCHEMA MANAGEMENT & REORDERING ---
   const addSection = async () => {
     if (!newSectionTitle) return;
     const newSection: Section = { id: Date.now().toString(), title: newSectionTitle, fields: [] };
@@ -799,7 +793,6 @@ export default function BuildingForm() {
                             )}
                         </div>
                     ))}
-                    {section.fields.length === 0 && <p className="text-xs text-slate-400 italic text-center py-4">No fields in this section yet.</p>}
                 </div>
             </div>
         ))}
