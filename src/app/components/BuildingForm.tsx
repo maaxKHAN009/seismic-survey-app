@@ -45,6 +45,10 @@ interface CustomField {
   options?: string[]; 
   subFields?: SubField[]; 
   required?: boolean;
+  dependsOn?: {
+    fieldId: string;
+    triggerValues: string[];
+  };
 }
 
 interface Section {
@@ -256,7 +260,10 @@ export default function BuildingForm() {
   const [tempSubFields, setTempSubFields] = useState<SubField[]>([]);
   const [newSubLabel, setNewSubLabel] = useState('');
   const [newSubType, setNewSubType] = useState<SubFieldType>('text');
-  const [newSubOptions, setNewSubOptions] = useState<string[]>(['']);
+  const [newSubOptions, setNewSubOptions] = useState<string[]>([]);
+
+  const [dependsOnFieldId, setDependsOnFieldId] = useState('');
+  const [dependsOnTriggerValues, setDependsOnTriggerValues] = useState<string[]>([]);
 
   const checkPending = async () => {
     if (localDB && localDB.outbox) {
@@ -437,11 +444,13 @@ export default function BuildingForm() {
       id: Date.now().toString(), label: newFieldLabel, type: newFieldType,
       tooltip: newFieldTooltip || 'Observation required.',
       options: (newFieldType === 'select' || newFieldType === 'multi_select') ? newOptions.filter(o => o.trim() !== '') : undefined,
-      subFields: newFieldType === 'group' ? tempSubFields : undefined
+      subFields: newFieldType === 'group' ? tempSubFields : undefined,
+      dependsOn: dependsOnFieldId ? { fieldId: dependsOnFieldId, triggerValues: dependsOnTriggerValues } : undefined
     };
     const updatedSections = sections.map(sec => sec.id === targetSectionId ? { ...sec, fields: [...sec.fields, newField] } : sec);
     await updateSchema(updatedSections);
     setNewFieldLabel(''); setNewOptions(['']); setTempSubFields([]);
+    setDependsOnFieldId(''); setDependsOnTriggerValues([]);
   };
 
   const removeField = async (sectionId: string, fieldId: string) => {
@@ -582,6 +591,15 @@ export default function BuildingForm() {
   const filteredReports = reports.filter(r => r.building_id.toLowerCase().includes(searchQuery.toLowerCase()));
   const paginatedReports = filteredReports.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
+  const shouldShowField = (field: CustomField): boolean => {
+    if (!field.dependsOn) return true;
+    const parentField = sections.flatMap(s => s.fields).find(f => f.id === field.dependsOn?.fieldId);
+    if (!parentField) return true;
+    const parentValue = formData[parentField.label];
+    if (!parentValue) return false;
+    return field.dependsOn.triggerValues.includes(String(parentValue));
+  };
+
   return (
     <div className="max-w-screen-lg mx-auto px-4 pb-32 pt-6 space-y-8 min-h-screen bg-[#F5F5F5]">
       
@@ -682,6 +700,24 @@ export default function BuildingForm() {
                        <div className="space-y-1 mt-2">{tempSubFields.map(sf => (<div key={sf.id} className="flex justify-between text-[10px] bg-white/5 p-1 rounded px-2"><span>{sf.label} ({sf.type})</span><button className="text-red-400" onClick={() => setTempSubFields(tempSubFields.filter(t => t.id !== sf.id))}>x</button></div>))}</div>
                    </div>
                 )}
+
+                <div className="bg-black/20 p-3 rounded-xl space-y-2">
+                    <p className="text-[10px] text-[#39CCCC] font-bold">Configure Conditional Display (Optional)</p>
+                    <select className="w-full p-2 bg-white text-black text-xs rounded" value={dependsOnFieldId} onChange={(e) => setDependsOnFieldId(e.target.value)}>
+                        <option value="">No Dependency</option>
+                        {sections.flatMap(sec => sec.fields).map(field => (
+                            <option key={field.id} value={field.id}>{field.label}</option>
+                        ))}
+                    </select>
+                    {dependsOnFieldId && (
+                        <div>
+                            <p className="text-[9px] text-white mb-1">Show this field when parent field equals:</p>
+                            <input type="text" placeholder="Trigger values (comma sep)" className="w-full p-2 bg-white/10 text-white text-xs rounded" value={dependsOnTriggerValues.join(', ')} onChange={(e) => setDependsOnTriggerValues(e.target.value.split(',').map(v => v.trim()).filter(v => v))} />
+                            <p className="text-[8px] text-gray-300 mt-1">E.g., if parent field is "Building Material", enter: RCC, Wooden</p>
+                        </div>
+                    )}
+                </div>
+
                 <button onClick={addField} disabled={!targetSectionId} className="w-full bg-[#39CCCC] text-[#001F3F] p-3 rounded-xl font-black text-xs uppercase tracking-widest mt-2 disabled:opacity-50">DEPLOY FIELD</button>
             </div>
           </div>
@@ -707,6 +743,7 @@ export default function BuildingForm() {
 
                 <div className="grid grid-cols-1 gap-4">
                     {section.fields.map((f, fIdx) => (
+                        shouldShowField(f) && (
                         <div key={f.id} className="bg-white p-4 sm:p-6 rounded-2xl border-2 border-slate-100 shadow-sm relative hover:border-blue-200 transition-colors">
                             <div className="flex justify-between items-center mb-2">
                                 <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111] flex items-center gap-1">
@@ -780,6 +817,7 @@ export default function BuildingForm() {
                                 </label>
                             )}
                         </div>
+                        )
                     ))}
                 </div>
             </div>
