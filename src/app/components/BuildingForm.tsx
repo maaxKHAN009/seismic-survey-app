@@ -715,17 +715,56 @@ export default function BuildingForm() {
   }
 
   const deleteSelected = async () => {
-    if (!window.confirm(`Purge ${selectedRows.size} records?`)) return;
-    const filesToPurge: string[] = [];
-    reports.filter(r => selectedRows.has(r.id)).forEach(report => {
-      Object.values(report.full_data).forEach(val => {
-        if (Array.isArray(val)) val.forEach((i: any) => { if(i.url && i.url.includes('r2')) filesToPurge.push(i.url.split('/').pop()!); });
+    if (batchSelectedReports.size === 0) {
+      alert('Select records to purge first');
+      return;
+    }
+    if (!window.confirm(`Purge ${batchSelectedReports.size} records permanently? This cannot be undone.`)) return;
+    
+    try {
+      const filesToPurge: string[] = [];
+      reports.filter(r => batchSelectedReports.has(r.id)).forEach(report => {
+        Object.values(report.full_data).forEach(val => {
+          if (Array.isArray(val)) {
+            val.forEach((i: any) => { 
+              if(i.url && i.url.includes('r2')) {
+                const fileName = i.url.split('/').pop();
+                if (fileName) filesToPurge.push(fileName);
+              }
+            });
+          }
+        });
       });
-    });
-    if (filesToPurge.length > 0) await fetch('/api/delete-file', { method: 'POST', body: JSON.stringify({ keys: filesToPurge }) });
-    await supabase.from('building_reports').delete().in('id', Array.from(selectedRows));
-    setSelectedRows(new Set()); loadReports();
-    alert("System Cleaned.");
+      
+      console.log(`Deleting ${batchSelectedReports.size} records and ${filesToPurge.length} R2 files`);
+      
+      // Delete R2 files first
+      if (filesToPurge.length > 0) {
+        const deleteRes = await fetch('/api/delete-file', { 
+          method: 'POST', 
+          body: JSON.stringify({ keys: filesToPurge }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!deleteRes.ok) {
+          console.error('R2 delete error:', await deleteRes.text());
+        }
+      }
+      
+      // Then delete database records
+      const { error } = await supabase.from('building_reports').delete().in('id', Array.from(batchSelectedReports));
+      if (error) {
+        console.error('Database delete error:', error);
+        alert(`Error deleting records: ${error.message}`);
+        return;
+      }
+      
+      setBatchSelectedReports(new Set());
+      await loadReports();
+      alert(`Successfully purged ${batchSelectedReports.size} records.`);
+    } catch (err) {
+      console.error('Purge error:', err);
+      alert(`Purge failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
   };
 
   const saveEditedReport = async () => {
