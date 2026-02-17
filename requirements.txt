@@ -1,0 +1,11 @@
+customtkinter
+pandas
+numpy
+matplotlib
+mplcursors
+folium
+python-docx
+requests
+openpyxl
+scikit-learn
+pillow

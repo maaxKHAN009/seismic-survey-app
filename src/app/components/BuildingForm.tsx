@@ -123,30 +123,55 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
     setUploading(true);
     const newItems = [...value];
 
-    for (const file of files) {
+    // Process all files with Promise.all to wait for all uploads
+    const uploadPromises = files.map(async (file) => {
       if (navigator.onLine) {
         const formData = new FormData();
         formData.append('file', file);
         try {
+          console.log('Starting R2 upload for:', file.name);
           const res = await fetch('/api/upload', { method: 'POST', body: formData });
-          if (!res.ok) throw new Error("API Error");
+          if (!res.ok) {
+            const error = await res.text();
+            console.error('Upload API error:', res.status, error);
+            throw new Error(`API Error: ${res.status}`);
+          }
           const data = await res.json();
+          console.log('R2 upload successful, URL:', data.url);
           newItems.push({ url: data.url, label: `Capture ${newItems.length + 1}`, isLocal: false });
-        } catch (err) { saveLocally(file, newItems); }
-      } else { saveLocally(file, newItems); }
-    }
-    if (navigator.onLine) { onChange(newItems); setUploading(false); }
+        } catch (err) {
+          console.error('R2 upload failed, saving locally:', err);
+          await saveLocally(file, newItems);
+        }
+      } else {
+        console.log('Offline, saving locally:', file.name);
+        await saveLocally(file, newItems);
+      }
+    });
+
+    // Wait for all uploads to complete before updating state
+    await Promise.all(uploadPromises);
+    onChange(newItems);
+    setUploading(false);
   };
 
-  const saveLocally = (file: File, items: ImageObject[]) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-        if (reader.result) {
-            items.push({ url: reader.result as string, label: `Offline Img ${items.length + 1}`, isLocal: true });
-            onChange([...items]); setUploading(false);
-        }
-    };
-    reader.readAsDataURL(file);
+  const saveLocally = (file: File, items: ImageObject[]): Promise<void> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+          if (reader.result) {
+              items.push({ url: reader.result as string, label: `Offline Img ${items.length + 1}`, isLocal: true });
+              resolve();
+          } else {
+              resolve();
+          }
+      };
+      reader.onerror = () => {
+          console.error('FileReader error:', reader.error);
+          resolve();
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const updateLabel = (index: number, newText: string) => {

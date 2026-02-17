@@ -4,6 +4,7 @@ import os
 import sys
 import traceback
 import ctypes
+import subprocess
 import threading
 import requests  # For robust image downloading
 import shutil
@@ -99,6 +100,8 @@ class SeismicAnalyzerApp(ctk.CTk):
         self.btn_imgs = ctk.CTkButton(self.export_frame, text="📷 Dwnld Pics", width=120, command=self.download_images_thread, fg_color="#334E68")
         self.btn_imgs.pack(side="right")
 
+        
+
         self.passport_btn = ctk.CTkButton(self.sidebar, text="📘 Generate Passports", command=self.generate_passport_thread,
                                      fg_color="#FF851B", text_color=NAVY, font=("Arial", 12, "bold"))
         self.passport_btn.grid(row=8, column=0, padx=20, pady=5, sticky="ew")
@@ -106,6 +109,11 @@ class SeismicAnalyzerApp(ctk.CTk):
         self.pdf_btn = ctk.CTkButton(self.sidebar, text="📄 Export PDF Report", command=self.export_pdf,
                                      fg_color=WHITE, text_color=NAVY, font=("Arial", 12, "bold"))
         self.pdf_btn.grid(row=9, column=0, padx=20, pady=5, sticky="ew")
+
+        # Quick launcher for the advanced analyzer (runs in separate process)
+        self.advanced_btn = ctk.CTkButton(self.sidebar, text="🚀 Open Advanced Analyzer", command=self.launch_advanced_analyzer,
+                          fg_color="#39CCCC", text_color=NAVY, font=("Arial", 11, "bold"))
+        self.advanced_btn.grid(row=10, column=0, padx=20, pady=5, sticky="ew")
 
         # --- Query Builder ---
         self.lbl_query = ctk.CTkLabel(self.sidebar, text="QUERY BUILDER", font=("Arial", 11, "bold"), text_color=AQUA, anchor="w")
@@ -200,6 +208,18 @@ class SeismicAnalyzerApp(ctk.CTk):
         
         self.map_info = ctk.CTkLabel(self.map_frame, text="Requires 'Lat' and 'Lon' columns in data", text_color="gray")
         self.map_info.place(relx=0.5, rely=0.6, anchor="center")
+
+    def launch_advanced_analyzer(self):
+        """Launch the separate advanced analyzer (analysis_gui_v2.py) in a new Python process."""
+        try:
+            python = sys.executable or 'python'
+            script = os.path.join(os.path.dirname(__file__), '..', 'analysis_gui_v2.py')
+            # If file path not found relative, fall back to workspace
+            if not os.path.exists(script):
+                script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'analysis_gui_v2.py')
+            subprocess.Popen([python, script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except Exception as e:
+            messagebox.showerror("Launch Error", f"Could not start advanced analyzer: {e}")
 
     # --- LAZY LOADING LOGIC ---
     def load_file(self):
