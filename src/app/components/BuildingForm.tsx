@@ -45,6 +45,7 @@ interface CustomField {
   options?: string[]; 
   subFields?: SubField[]; 
   required?: boolean;
+  allowComments?: boolean;
   dependsOn?: {
     fieldId: string;
     conditionType: 'equals' | 'notCaptured' | 'countGreaterThan' | 'isEmpty';
@@ -197,7 +198,7 @@ const MultiSelect = ({ options, value, onChange }: { options: string[], value: s
     );
 };
 
-const DynamicSeries = ({ value, onChange }: { value: DynamicSeriesItem[], onChange: (val: DynamicSeriesItem[]) => void }) => {
+const DynamicSeries = ({ value, onChange, darkModeProp = false }: { value: DynamicSeriesItem[], onChange: (val: DynamicSeriesItem[]) => void, darkModeProp?: boolean }) => {
     const addRow = () => {
         const nextIdx = value.length + 1;
         onChange([...value, { label: `Story ${nextIdx}`, value: '' }]);
@@ -209,21 +210,22 @@ const DynamicSeries = ({ value, onChange }: { value: DynamicSeriesItem[], onChan
         onChange(updated);
     };
 
+    const dm = darkModeProp;
     return (
-        <div className="space-y-2">
-            {value.map((item, idx) => (
-                <div key={idx} className="flex gap-2">
-                    <input type="text" className="w-1/2 p-2 bg-[#F5F5F5] rounded border font-bold text-xs" 
-                        value={item.label} onChange={(e) => updateRow(idx, 'label', e.target.value)} placeholder="Label (e.g. Story 1)" />
-                    <input type="number" className="w-1/2 p-2 bg-white rounded border font-bold text-xs text-black" 
-                        value={item.value} onChange={(e) => updateRow(idx, 'value', e.target.value)} placeholder="Value" />
-                    <button onClick={() => onChange(value.filter((_, i) => i !== idx))} className="text-red-500"><Trash2 size={16}/></button>
-                </div>
-            ))}
-            <button onClick={addRow} className="w-full py-2 bg-[#DDDDDD] rounded-lg text-xs font-black text-[#111111] hover:bg-[#CCCCCC] flex items-center justify-center gap-2">
-                <Plus size={14} /> ADD ROW
-            </button>
-        </div>
+      <div className="space-y-2">
+        {value.map((item, idx) => (
+          <div key={idx} className="flex gap-2">
+            <input type="text" className={`w-1/2 p-2 rounded border font-bold text-xs ${dm ? 'bg-slate-700 text-white border-slate-600 placeholder:text-slate-300' : 'bg-[#F5F5F5] text-black border-[#CCCCCC] placeholder:text-slate-500'}`} 
+              value={item.label} onChange={(e) => updateRow(idx, 'label', e.target.value)} placeholder="Label (e.g. Story 1)" />
+            <input type="number" className={`w-1/2 p-2 rounded border font-bold text-xs ${dm ? 'bg-slate-800 text-white border-slate-600 placeholder:text-slate-300' : 'bg-white text-black border-[#AAAAAA] placeholder:text-slate-500'}`} 
+              value={item.value} onChange={(e) => updateRow(idx, 'value', e.target.value)} placeholder="Value" />
+            <button onClick={() => onChange(value.filter((_, i) => i !== idx))} className="text-red-500"><Trash2 size={16}/></button>
+          </div>
+        ))}
+        <button onClick={addRow} className="w-full py-2 bg-[#DDDDDD] rounded-lg text-xs font-black text-[#111111] hover:bg-[#CCCCCC] flex items-center justify-center gap-2">
+          <Plus size={14} /> ADD ROW
+        </button>
+      </div>
     );
 };
 
@@ -271,6 +273,7 @@ export default function BuildingForm() {
 
   const [dependsOnConditionType, setDependsOnConditionType] = useState<'equals' | 'notCaptured' | 'countGreaterThan' | 'isEmpty'>('equals');
   const [dependsOnTriggerCount, setDependsOnTriggerCount] = useState<number>(0);
+  const [newFieldAllowComments, setNewFieldAllowComments] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>('admin');
   const [showExportImport, setShowExportImport] = useState(false);
@@ -636,6 +639,7 @@ export default function BuildingForm() {
       options: (newFieldType === 'select' || newFieldType === 'multi_select') ? newOptions.filter(o => o.trim() !== '') : undefined,
       subFields: newFieldType === 'group' ? tempSubFields : undefined,
       required: false,
+      allowComments: newFieldAllowComments,
       dependsOn: dependsOnFieldId ? { 
         fieldId: dependsOnFieldId, 
         conditionType: dependsOnConditionType,
@@ -647,6 +651,7 @@ export default function BuildingForm() {
     await updateSchema(updatedSections);
     setNewFieldLabel(''); setNewOptions(['']); setTempSubFields([]);
     setDependsOnFieldId(''); setDependsOnTriggerValues([]); setDependsOnTriggerCount(0); setDependsOnConditionType('equals');
+    setNewFieldAllowComments(false);
   };
 
   const removeField = async (sectionId: string, fieldId: string) => {
@@ -823,6 +828,19 @@ export default function BuildingForm() {
     await updateSchema(updatedSections);
   };
 
+  const toggleFieldAllowComments = async (sectionId: string, fieldId: string) => {
+    const updatedSections = sections.map(sec => {
+      if (sec.id === sectionId) {
+        return {
+          ...sec,
+          fields: sec.fields.map(f => f.id === fieldId ? { ...f, allowComments: !f.allowComments } : f)
+        };
+      }
+      return sec;
+    });
+    await updateSchema(updatedSections);
+  };
+
   const moveFieldBetweenSections = async (fromSectionId: string, toSectionId: string, fieldIndex: number) => {
     const fromSection = sections.find(s => s.id === fromSectionId);
     if (!fromSection || fieldIndex < 0 || fieldIndex >= fromSection.fields.length) return;
@@ -865,7 +883,7 @@ export default function BuildingForm() {
   };
 
   return (
-    <div className="max-w-screen-lg mx-auto px-4 pb-32 pt-6 space-y-8 min-h-screen bg-[#F5F5F5]">
+    <div className={`max-w-screen-lg mx-auto px-4 pb-32 pt-6 space-y-8 min-h-screen ${darkMode ? 'bg-slate-900 text-white' : 'bg-[#F5F5F5] text-black'}`}>
       
       <div className="text-center space-y-1">
          <h1 className="text-2xl md:text-3xl font-black text-[#001F3F] tracking-tighter">UET x EPFL</h1>
@@ -1043,6 +1061,11 @@ export default function BuildingForm() {
                 </div>
                 <input type="text" placeholder="Tooltip/Guidance" className="w-full p-3 bg-white/10 rounded-xl text-xs font-bold border border-white/10 text-white" value={newFieldTooltip} onChange={(e) => setNewFieldTooltip(e.target.value)} />
 
+                <label className="flex items-center gap-2 text-white text-xs cursor-pointer bg-white/5 p-3 rounded-xl border border-white/10">
+                  <input type="checkbox" checked={newFieldAllowComments} onChange={(e) => setNewFieldAllowComments(e.target.checked)} className="accent-[#39CCCC] cursor-pointer" />
+                  <span className="font-bold">💬 Allow Surveyor Comments</span>
+                </label>
+
                 {(newFieldType === 'select' || newFieldType === 'multi_select') && (
                   <input type="text" placeholder="Options (comma separated)" className="w-full p-3 bg-white/10 rounded-xl text-xs text-white" value={newOptions.join(',')} onChange={(e) => setNewOptions(e.target.value.split(',').map(o => o.trim()).filter(o => o))} />
                 )}
@@ -1198,6 +1221,7 @@ export default function BuildingForm() {
                                 {isAdmin && (
                                     <div className="flex gap-2">
                                         <button onClick={() => toggleFieldRequired(section.id, f.id)} title={f.required ? 'Remove Required' : 'Mark Required'} className={`transition-colors p-1 ${f.required ? 'text-red-500 bg-red-50 rounded' : 'text-slate-300 hover:text-orange-500'}`}><CheckSquare size={14}/></button>
+                                        <button onClick={() => toggleFieldAllowComments(section.id, f.id)} title={f.allowComments ? 'Disable Comments' : 'Allow Comments'} className={`transition-colors p-1 ${f.allowComments ? 'text-blue-500 bg-blue-50 rounded' : 'text-slate-300 hover:text-blue-500'}`}>💬</button>
                                         <button onClick={() => moveField(section.id, fIdx, 'up')} className="text-slate-300 hover:text-blue-500"><ArrowUp size={14}/></button>
                                         <button onClick={() => moveField(section.id, fIdx, 'down')} className="text-slate-300 hover:text-blue-500"><ArrowDown size={14}/></button>
                                         <button onClick={() => removeField(section.id, f.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button>
@@ -1223,7 +1247,7 @@ export default function BuildingForm() {
                             )}
 
                             {f.type === 'dynamic_series' && (
-                                <DynamicSeries value={formData[f.label] || []} onChange={(val) => setFormData({...formData, [f.label]: val})} />
+                                <DynamicSeries value={formData[f.label] || []} onChange={(val) => setFormData({...formData, [f.label]: val})} darkModeProp={darkMode} />
                             )}
 
                             {f.type === 'group' && f.subFields && (
@@ -1262,6 +1286,10 @@ export default function BuildingForm() {
                                     <span className="text-xs font-bold uppercase text-[#111111]">Verified</span>
                                 </label>
                             )}
+
+                            {f.allowComments && (
+                                <textarea placeholder="Add explanation or additional notes (optional)" className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#CCCCCC] focus:border-[#85144B] outline-none text-[#111111] min-h-24 resize-none" value={formData[`${f.label}_comment`] || ''} onChange={(e) => setFormData({...formData, [`${f.label}_comment`]: e.target.value})} />
+                            )}
                         </div>
                         )
                     ))}
@@ -1296,11 +1324,13 @@ export default function BuildingForm() {
         </>
       )}
 
-      {/* Dark Mode Styles */}
+      {/* Dark Mode Styles (basic overrides) */}
       {darkMode && (
         <style>{`
-          body { @apply bg-slate-900 text-white; }
-          input, select, textarea { @apply bg-slate-800 text-white border-slate-600; }
+          body { background-color: #0f172a !important; color: #f8fafc !important; }
+          input, select, textarea, button { background-color: #0b1220 !important; color: #f8fafc !important; border-color: #334155 !important; }
+          .bg-white { background-color: #0b1220 !important; }
+          .text-black { color: #f8fafc !important; }
         `}</style>
       )}
 
@@ -1339,7 +1369,7 @@ export default function BuildingForm() {
                         <MultiSelect options={f.options || []} value={editingReport.full_data[f.label] || []} onChange={(val) => handleEditChange(f.label, val)} />
                     )}
                     {f.type === 'dynamic_series' && (
-                        <DynamicSeries value={editingReport.full_data[f.label] || []} onChange={(val) => handleEditChange(f.label, val)} />
+                        <DynamicSeries value={editingReport.full_data[f.label] || []} onChange={(val) => handleEditChange(f.label, val)} darkModeProp={darkMode} />
                     )}
                     {f.type === 'group' && f.subFields && (
                        <div className="grid grid-cols-2 gap-2 bg-slate-100 p-2 rounded">
@@ -1358,6 +1388,9 @@ export default function BuildingForm() {
                          <input type="checkbox" className="w-5 h-5 accent-[#85144B]" checked={!!editingReport.full_data[f.label]} onChange={(e) => handleEditChange(f.label, e.target.checked)} />
                          <span className="text-xs font-bold text-black">Verified</span>
                        </div>
+                    )}
+                    {f.allowComments && (
+                       <textarea placeholder="Add explanation or additional notes (optional)" className="w-full p-3 bg-slate-50 rounded-xl font-bold text-sm border-2 border-slate-300 text-black min-h-24 resize-none" value={editingReport.full_data[`${f.label}_comment`] || ''} onChange={(e) => handleEditChange(`${f.label}_comment`, e.target.value)} />
                     )}
                     {f.type === 'image' && (
                        <ImageUpload label={f.label} value={editingReport.full_data[f.label] || []} onChange={(imgs) => handleEditChange(f.label, imgs)} />
