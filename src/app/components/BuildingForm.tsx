@@ -1303,7 +1303,7 @@ export default function BuildingForm() {
     <div className={`max-w-screen-lg mx-auto px-4 pb-32 pt-6 space-y-8 min-h-screen ${darkMode ? 'bg-slate-900 text-white' : 'bg-[#F5F5F5] text-black'}`}>
       
       <div className="text-center space-y-1">
-         <h1 className="text-2xl md:text-3xl font-black text-[#001F3F] tracking-tighter">UET x EPFL</h1>
+         <h1 className="text-2xl md:text-3xl font-black text-[#001F3F] tracking-tighter">Survey</h1>
          <p className="text-xs font-bold text-[#85144B] uppercase tracking-[0.2em]">Building Specific Survey</p>
       </div>
 
