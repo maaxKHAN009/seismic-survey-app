@@ -46,6 +46,7 @@ interface CustomField {
   subFields?: SubField[]; 
   required?: boolean;
   allowComments?: boolean;
+  autoDate?: boolean;
   dependsOn?: {
     fieldId: string;
     conditionType: 'equals' | 'notCaptured' | 'countGreaterThan' | 'isEmpty';
@@ -286,6 +287,8 @@ export default function BuildingForm() {
   const [newFieldLabel, setNewFieldLabel] = useState('');
   const [newFieldType, setNewFieldType] = useState<FieldType>('text');
   const [newFieldTooltip, setNewFieldTooltip] = useState('');
+  const [newFieldAllowComments, setNewFieldAllowComments] = useState(false);
+  const [newFieldAutoDate, setNewFieldAutoDate] = useState(false);
   const [newOptions, setNewOptions] = useState<string[]>(['']);
   
   const [tempSubFields, setTempSubFields] = useState<SubField[]>([]);
@@ -316,6 +319,19 @@ export default function BuildingForm() {
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [batchSelectedReports, setBatchSelectedReports] = useState<Set<string>>(new Set());
   const [showQualityIndicator, setShowQualityIndicator] = useState(true);
+
+  // NEW: Surveyor tracking and timing
+  const [surveyorName, setSurveyorName] = useState('');
+  const [showSurveyorModal, setShowSurveyorModal] = useState(false);
+  const [tempSurveyorName, setTempSurveyorName] = useState('');
+  const [surveyStartTime, setSurveyStartTime] = useState<number | null>(null);
+  const [surveyEndTime, setSurveyEndTime] = useState<number | null>(null);
+
+  // Field editing state
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [editingFieldSectionId, setEditingFieldSectionId] = useState<string | null>(null);
+  const [editFieldType, setEditFieldType] = useState<FieldType>('text');
+  const [editFieldOptions, setEditFieldOptions] = useState<string[]>([]);
 
   const checkPending = async () => {
     if (localDB && localDB.outbox) {
@@ -398,6 +414,14 @@ export default function BuildingForm() {
       } catch (e) {
         console.error('Failed to load draft');
       }
+    }
+
+    // Load surveyor name and show modal if not set
+    const savedSurveyorName = localStorage.getItem('surveyorName');
+    if (savedSurveyorName) {
+      setSurveyorName(savedSurveyorName);
+    } else {
+      setShowSurveyorModal(true);
     }
   }, []);
 
@@ -579,15 +603,85 @@ export default function BuildingForm() {
       return alert(`⚠️ Missing Required Fields:\n• ${fieldList}\n\nPlease fill these before submitting.`);
     }
 
-    const entry = { building_id: formData['Building ID'], full_data: formData, timestamp: Date.now() };
+    // Add end time and duration
+    const endTime = Date.now();
+    const startTime = formData['__startTime'] || surveyStartTime || endTime;
+    const duration = Math.round((endTime - startTime) / 1000); // Duration in seconds
+    
+    const fullData = {
+      ...formData,
+      '__endTime': endTime,
+      '__duration': duration
+    };
+
+    const entry = { building_id: fullData['Building ID'], full_data: fullData, timestamp: endTime };
     if (isOnline) {
       try {
           const { error } = await supabase.from('building_reports').insert([{ building_id: entry.building_id, full_data: entry.full_data }]);
-          if (!error) { alert("✅ Packet Uploaded!"); localStorage.removeItem('formDataDraft'); setFormData({}); setUnsavedChanges(false); loadReports(); } else { throw new Error("DB Error"); }
-      } catch (e) { await localDB.outbox.add(entry); await checkPending(); alert("⚠️ Connection unstable. Saved Locally."); setFormData({}); setUnsavedChanges(false); }
+          if (!error) { 
+            alert("✅ Packet Uploaded!"); 
+            localStorage.removeItem('formDataDraft'); 
+            setFormData({}); 
+            setSurveyStartTime(null);
+            setUnsavedChanges(false); 
+            loadReports(); 
+          } else { throw new Error("DB Error"); }
+      } catch (e) { 
+        await localDB.outbox.add(entry); 
+        await checkPending(); 
+        alert("⚠️ Connection unstable. Saved Locally."); 
+        setFormData({}); 
+        setSurveyStartTime(null);
+        setUnsavedChanges(false); 
+      }
     } else {
-      await localDB.outbox.add(entry); await checkPending(); alert("📦 Offline Mode: Saved to Vault."); setFormData({}); setUnsavedChanges(false);
+      await localDB.outbox.add(entry); 
+      await checkPending(); 
+      alert("📦 Offline Mode: Saved to Vault."); 
+      setFormData({}); 
+      setSurveyStartTime(null);
+      setUnsavedChanges(false);
     }
+  };
+
+  const handleSaveSurveyorName = () => {
+    if (!tempSurveyorName.trim()) {
+      alert('Please enter your name');
+      return;
+    }
+    const cleanName = tempSurveyorName.trim().replace(/[^a-zA-Z0-9]/g, '');
+    localStorage.setItem('surveyorName', cleanName);
+    setSurveyorName(cleanName);
+    setShowSurveyorModal(false);
+    setTempSurveyorName('');
+  };
+
+  const generateBuildingId = (name: string): string => {
+    // Get counter from localStorage for this surveyor
+    const counterKey = `survey_counter_${name}`;
+    let counter = parseInt(localStorage.getItem(counterKey) || '0', 10);
+    counter++;
+    localStorage.setItem(counterKey, counter.toString());
+    return `${name}-${String(counter).padStart(3, '0')}`;
+  };
+
+  const startNewSurvey = () => {
+    if (!surveyorName) {
+      setShowSurveyorModal(true);
+      return;
+    }
+    
+    const newBuildingId = generateBuildingId(surveyorName);
+    const startTime = Date.now();
+    
+    setFormData({
+      'Surveyor Name': surveyorName,
+      'Building ID': newBuildingId,
+      '__startTime': startTime,
+    });
+    setSurveyStartTime(startTime);
+    setUnsavedChanges(false);
+    localStorage.removeItem('formDataDraft');
   };
 
   const captureGPS = (label: string) => { 
@@ -665,6 +759,7 @@ export default function BuildingForm() {
       subFields: newFieldType === 'group' ? tempSubFields : undefined,
       required: false,
       allowComments: newFieldAllowComments,
+      autoDate: newFieldAutoDate && newFieldType === 'text',
       dependsOn: dependsOnFieldId ? { 
         fieldId: dependsOnFieldId, 
         conditionType: dependsOnConditionType,
@@ -677,6 +772,7 @@ export default function BuildingForm() {
     setNewFieldLabel(''); setNewOptions(['']); setTempSubFields([]);
     setDependsOnFieldId(''); setDependsOnTriggerValues([]); setDependsOnTriggerCount(0); setDependsOnConditionType('equals');
     setNewFieldAllowComments(false);
+    setNewFieldAutoDate(false);
   };
 
   const removeField = async (sectionId: string, fieldId: string) => {
@@ -788,65 +884,146 @@ export default function BuildingForm() {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Data');
     
-    const textHeaders = new Set<string>();
+    // Identify all field types
     const imageFields = new Map<string, number>();
-    const dynamicSeriesFields = new Set<string>();
+    const dynamicSeriesFields = new Map<string, string[]>();
+    const hiddenFields = ['__startTime', '__endTime', '__duration'];
 
     dataToExport.forEach(r => {
       Object.entries(r.full_data).forEach(([k, v]) => {
         if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].url) {
           imageFields.set(k, Math.max(imageFields.get(k) || 0, v.length));
         } else if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].label && v[0].value !== undefined) {
-             v.forEach((item: DynamicSeriesItem) => dynamicSeriesFields.add(`${k} [${item.label}]`));
-        } else {
-          textHeaders.add(k);
+          const labels = v.map((item: DynamicSeriesItem) => item.label);
+          dynamicSeriesFields.set(k, labels);
         }
       });
     });
 
-    const columns: any[] = [{ header: 'DATE', key: 'date', width: 15 }, { header: 'ID', key: 'id', width: 20 }];
-    textHeaders.forEach(h => columns.push({ header: h.toUpperCase(), key: h, width: 25 }));
-    Array.from(dynamicSeriesFields).sort().forEach(h => columns.push({ header: h.toUpperCase(), key: h, width: 20 }));
+    // Build columns in form field order
+    const columns: any[] = [];
+    const columnPositions = new Map<string, number>();
 
-    imageFields.forEach((max, label) => {
-      for (let i = 1; i <= max; i++) columns.push({ header: `${label.toUpperCase()} ${i}`, key: `${label}_${i}`, width: 30 });
+    // Add metadata columns first
+    columns.push({ header: 'SURVEYOR NAME', key: 'surveyorName', width: 20 });
+    columns.push({ header: 'BUILDING ID', key: 'buildingId', width: 20 });
+    columns.push({ header: 'DATE SUBMITTED', key: 'dateSubmitted', width: 15 });
+    
+    let colIdx = columns.length;
+
+    // Add fields by section order
+    sections.forEach(section => {
+      const sectionStartIdx = colIdx;
+      
+      section.fields.forEach(field => {
+        if (!hiddenFields.includes(field.label) && field.label !== 'Building ID' && field.label !== 'Surveyor Name') {
+          if (field.type === 'group' && field.subFields) {
+            field.subFields.forEach(sub => {
+              const key = `${field.label} [${sub.label}]`;
+              columns.push({ header: key.toUpperCase(), key, width: 18, sectionName: section.title });
+              columnPositions.set(key, colIdx);
+              colIdx++;
+            });
+          } else if (field.type === 'image') {
+            const max = imageFields.get(field.label) || 0;
+            for (let i = 1; i <= max; i++) {
+              const key = `${field.label}_${i}`;
+              columns.push({ header: `${field.label.toUpperCase()} ${i}`, key, width: 30, sectionName: section.title });
+              columnPositions.set(key, colIdx);
+              colIdx++;
+            }
+          } else if (field.type === 'dynamic_series') {
+            const labels = dynamicSeriesFields.get(field.label) || [];
+            labels.forEach(label => {
+              const key = `${field.label} [${label}]`;
+              columns.push({ header: key.toUpperCase(), key, width: 18, sectionName: section.title });
+              columnPositions.set(key, colIdx);
+              colIdx++;
+            });
+          } else {
+            columns.push({ header: field.label.toUpperCase(), key: field.label, width: 22, sectionName: section.title });
+            columnPositions.set(field.label, colIdx);
+            colIdx++;
+          }
+        }
+      });
     });
+
+    // Add hidden timing fields at the end
+    columns.push({ header: 'START TIME', key: '__startTime', width: 20, hidden: true });
+    columns.push({ header: 'END TIME', key: '__endTime', width: 20, hidden: true });
+    columns.push({ header: 'DURATION (SECONDS)', key: '__duration', width: 20, hidden: true });
 
     worksheet.columns = columns;
 
+    // Add data rows
     dataToExport.forEach(r => {
-      const row: any = { date: new Date(r.created_at).toLocaleDateString(), id: r.building_id };
+      const row: any = {
+        surveyorName: r.full_data['Surveyor Name'] || '',
+        buildingId: r.building_id,
+        dateSubmitted: new Date(r.created_at).toLocaleDateString(),
+      };
       
-      textHeaders.forEach(h => {
-          const val = r.full_data[h];
-          row[h] = Array.isArray(val) ? val.join(', ') : val ? String(val) : '';
-      });
-
-      Object.entries(r.full_data).forEach(([k, v]) => {
-          if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].label && v[0].value !== undefined) {
-              v.forEach((item: DynamicSeriesItem) => {
-                  row[`${k} [${item.label}]`] = item.value;
+      // Add field values
+      sections.forEach(section => {
+        section.fields.forEach(field => {
+          if (!hiddenFields.includes(field.label) && field.label !== 'Building ID' && field.label !== 'Surveyor Name') {
+            const val = r.full_data[field.label];
+            
+            if (field.type === 'group' && field.subFields) {
+              field.subFields.forEach(sub => {
+                const key = `${field.label} [${sub.label}]`;
+                row[key] = r.full_data[key] || '';
               });
+            } else if (field.type === 'image') {
+              const photos = Array.isArray(val) ? val : [];
+              photos.forEach((p, idx) => {
+                row[`${field.label}_${idx+1}`] = { text: p.label || `Photo ${idx+1}`, hyperlink: p.url, tooltip: 'Click to view' };
+              });
+            } else if (field.type === 'dynamic_series') {
+              const items = Array.isArray(val) ? val : [];
+              items.forEach((item: DynamicSeriesItem) => {
+                row[`${field.label} [${item.label}]`] = item.value;
+              });
+            } else {
+              row[field.label] = Array.isArray(val) ? val.join(', ') : val ?? '';
+            }
           }
-      });
-
-      imageFields.forEach((max, label) => {
-        const photos = r.full_data[label];
-        if (Array.isArray(photos)) photos.forEach((p, idx) => {
-          row[`${label}_${idx+1}`] = { text: p.label || `Photo ${idx+1}`, hyperlink: p.url, tooltip: 'View' };
         });
       });
+
+      // Add hidden timing fields
+      row.__startTime = r.full_data['__startTime'] ? new Date(r.full_data['__startTime']).toLocaleString() : '';
+      row.__endTime = r.full_data['__endTime'] ? new Date(r.full_data['__endTime']).toLocaleString() : '';
+      row.__duration = r.full_data['__duration'] ? `${Math.floor(r.full_data['__duration'] / 60)}m ${r.full_data['__duration'] % 60}s` : '';
+
       worksheet.addRow(row);
     });
 
+    // Format worksheet
     worksheet.eachRow((row, i) => {
-        row.eachCell(c => {
-          c.alignment = { vertical: 'middle', horizontal: 'center' };
-          c.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-          if (i === 1) { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF001F3F' } }; c.font = { color: { argb: 'FF39CCCC' }, bold: true }; }
-        });
-        row.height = 30;
+      row.eachCell((cell, colNum) => {
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+        
+        if (i === 1) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF001F3F' } };
+          cell.font = { color: { argb: 'FF39CCCC' }, bold: true, size: 10 };
+        }
       });
+      row.height = Math.max(30, Math.ceil(row.height || 15));
+    });
+
+    // Auto-fit columns
+    worksheet.columns.forEach(col => {
+      let maxLength = col.header?.length || 10;
+      worksheet.eachRow(row => {
+        const cell = row.getCell(col.key!);
+        const cellValue = cell.value?.toString() || '';
+        maxLength = Math.max(maxLength, cellValue.length);
+      });
+      col.width = Math.min(Math.max(maxLength + 2, 15), 50);
+    });
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -898,6 +1075,55 @@ export default function BuildingForm() {
         return {
           ...sec,
           fields: sec.fields.map(f => f.id === fieldId ? { ...f, allowComments: !f.allowComments } : f)
+        };
+      }
+      return sec;
+    });
+    await updateSchema(updatedSections);
+  };
+
+  const editFieldType = async (sectionId: string, fieldId: string, newType: FieldType) => {
+    const updatedSections = sections.map(sec => {
+      if (sec.id === sectionId) {
+        return {
+          ...sec,
+          fields: sec.fields.map(f => {
+            if (f.id === fieldId) {
+              // When changing type, clear type-specific properties
+              const updated: CustomField = { ...f, type: newType };
+              if (newType !== 'select' && newType !== 'multi_select') updated.options = undefined;
+              if (newType !== 'group') updated.subFields = undefined;
+              return updated;
+            }
+            return f;
+          })
+        };
+      }
+      return sec;
+    });
+    await updateSchema(updatedSections);
+  };
+
+  const editFieldOptions = async (sectionId: string, fieldId: string, newOptions: string[]) => {
+    const updatedSections = sections.map(sec => {
+      if (sec.id === sectionId) {
+        return {
+          ...sec,
+          fields: sec.fields.map(f => f.id === fieldId ? { ...f, options: newOptions } : f)
+        };
+      }
+      return sec;
+    });
+    await updateSchema(updatedSections);
+  };
+
+  const editFieldLabel = async (sectionId: string, fieldId: string, newLabel: string) => {
+    if (!newLabel.trim()) return;
+    const updatedSections = sections.map(sec => {
+      if (sec.id === sectionId) {
+        return {
+          ...sec,
+          fields: sec.fields.map(f => f.id === fieldId ? { ...f, label: newLabel.trim() } : f)
         };
       }
       return sec;
@@ -1130,6 +1356,13 @@ export default function BuildingForm() {
                   <span className="font-bold">💬 Allow Surveyor Comments</span>
                 </label>
 
+                {newFieldType === 'text' && (
+                  <label className="flex items-center gap-2 text-white text-xs cursor-pointer bg-white/5 p-3 rounded-xl border border-white/10">
+                    <input type="checkbox" checked={newFieldAutoDate} onChange={(e) => setNewFieldAutoDate(e.target.checked)} className="accent-[#39CCCC] cursor-pointer" />
+                    <span className="font-bold">📅 Auto-populate with Today's Date</span>
+                  </label>
+                )}
+
                 {(newFieldType === 'select' || newFieldType === 'multi_select') && (
                   <input type="text" placeholder="Options (comma separated)" className="w-full p-3 bg-white/10 rounded-xl text-xs text-white" value={newOptions.join(',')} onChange={(e) => setNewOptions(e.target.value.split(',').map(o => o.trim()).filter(o => o))} />
                 )}
@@ -1284,6 +1517,7 @@ export default function BuildingForm() {
                                 </label>
                                 {isAdmin && (
                                     <div className="flex gap-2">
+                                        <button onClick={() => { setEditingFieldId(f.id); setEditingFieldSectionId(section.id); setEditFieldType(f.type); setEditFieldOptions(f.options || []); }} title="Edit Field" className="text-slate-300 hover:text-yellow-500"><PenTool size={14}/></button>
                                         <button onClick={() => toggleFieldRequired(section.id, f.id)} title={f.required ? 'Remove Required' : 'Mark Required'} className={`transition-colors p-1 ${f.required ? 'text-red-500 bg-red-50 rounded' : 'text-slate-300 hover:text-orange-500'}`}><CheckSquare size={14}/></button>
                                         <button onClick={() => toggleFieldAllowComments(section.id, f.id)} title={f.allowComments ? 'Disable Comments' : 'Allow Comments'} className={`transition-colors p-1 ${f.allowComments ? 'text-blue-500 bg-blue-50 rounded' : 'text-slate-300 hover:text-blue-500'}`}>💬</button>
                                         <button onClick={() => moveField(section.id, fIdx, 'up')} className="text-slate-300 hover:text-blue-500"><ArrowUp size={14}/></button>
@@ -1293,7 +1527,27 @@ export default function BuildingForm() {
                                 )}
                             </div>
 
-                            {f.type === 'text' && <input type="text" className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" placeholder="..." value={formData[f.label] || ''} onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} />}
+                            {f.type === 'text' && (
+                              f.autoDate ? (
+                                <input 
+                                  type="text" 
+                                  readOnly
+                                  className="w-full p-3 bg-slate-100 rounded-xl font-bold text-sm border-2 border-[#AAAAAA] text-[#111111] cursor-not-allowed"
+                                  value={formData[f.label] || (() => {
+                                    const today = new Date();
+                                    return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+                                  })()}
+                                />
+                              ) : (
+                                <input 
+                                  type="text" 
+                                  className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" 
+                                  placeholder="..." 
+                                  value={formData[f.label] || ''} 
+                                  onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} 
+                                />
+                              )
+                            )}
                             {f.type === 'number' && <input type="number" className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" placeholder="0" value={formData[f.label] || ''} onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} />}
                             
                             {f.type === 'select' && (
@@ -1364,10 +1618,111 @@ export default function BuildingForm() {
 
       {!isAdmin && (
         <>
-          {/* Keyboard Shortcuts Help */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-[9px]">
-            <p className="font-bold text-blue-900 mb-2">⌨️ Keyboard Shortcuts:</p>
-            <p className="text-blue-800"><kbd className="bg-white border rounded px-1">Ctrl+S</kbd> Submit Form | <kbd className="bg-white border rounded px-1">Escape</kbd> Close Modals</p>
+          {/* Surveyor Name Modal */}
+          {showSurveyorModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border-4 border-[#001F3F]">
+                <h2 className="text-lg font-black text-[#001F3F] mb-2">👤 Who are you?</h2>
+                <p className="text-xs text-slate-600 mb-4">Enter your name (first time only)</p>
+                <input 
+                  type="text" 
+                  placeholder="Your name" 
+                  className="w-full p-3 border-2 border-[#AAAAAA] rounded-xl text-black font-bold mb-4 focus:border-[#85144B] outline-none"
+                  value={tempSurveyorName}
+                  onChange={(e) => setTempSurveyorName(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSaveSurveyorName()}
+                />
+                <button 
+                  onClick={handleSaveSurveyorName}
+                  className="w-full bg-[#85144B] text-white font-black py-3 rounded-xl hover:bg-[#600e35] transition-all"
+                >
+                  GET STARTED
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Field Edit Modal */}
+          {editingFieldId && editingFieldSectionId && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border-4 border-[#001F3F] space-y-4 max-h-96 overflow-y-auto">
+                <h2 className="text-lg font-black text-[#001F3F]">✏️ Edit Field</h2>
+                
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Field Type</label>
+                  <select 
+                    value={editFieldType}
+                    onChange={async (e) => {
+                      const newType = e.target.value as FieldType;
+                      setEditFieldType(newType);
+                      await editFieldType(editingFieldSectionId, editingFieldId, newType);
+                    }}
+                    className="w-full p-2 border-2 border-[#AAAAAA] rounded-lg text-sm text-black"
+                  >
+                    <option value="text">Text</option>
+                    <option value="number">Number</option>
+                    <option value="select">Dropdown</option>
+                    <option value="multi_select">Multi-Select</option>
+                    <option value="checkbox">Checkbox</option>
+                    <option value="image">Image</option>
+                    <option value="gps">GPS</option>
+                    <option value="group">Group</option>
+                    <option value="dynamic_series">Dynamic Series</option>
+                  </select>
+                </div>
+
+                {(editFieldType === 'select' || editFieldType === 'multi_select') && (
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Options (comma separated)</label>
+                    <textarea 
+                      value={editFieldOptions.join(', ')}
+                      onChange={(e) => {
+                        const opts = e.target.value.split(',').map(o => o.trim()).filter(o => o);
+                        setEditFieldOptions(opts);
+                      }}
+                      className="w-full p-2 border-2 border-[#AAAAAA] rounded-lg text-sm text-black resize-none h-20"
+                    />
+                    <button 
+                      onClick={async () => {
+                        await editFieldOptions(editingFieldSectionId, editingFieldId, editFieldOptions);
+                        alert('Options updated!');
+                      }}
+                      className="w-full mt-2 bg-[#85144B] text-white font-bold py-2 rounded-lg text-xs"
+                    >
+                      Save Options
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      setEditingFieldId(null);
+                      setEditingFieldSectionId(null);
+                    }}
+                    className="flex-1 bg-slate-300 text-black font-bold py-2 rounded-lg text-xs hover:bg-slate-400"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* New Survey / Keyboard Shortcuts */}
+          <div className="space-y-3 mb-4">
+            {surveyorName && Object.keys(formData).length > 0 && (
+              <button 
+                onClick={startNewSurvey}
+                className="w-full bg-[#39CCCC] text-[#001F3F] font-black py-3 rounded-2xl shadow-lg hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs"
+              >
+                <Plus size={18} /> START NEW SURVEY
+              </button>
+            )}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-[9px]">
+              <p className="font-bold text-blue-900 mb-2">⌨️ Keyboard Shortcuts:</p>
+              <p className="text-blue-800"><kbd className="bg-white border rounded px-1">Ctrl+S</kbd> Submit Form | <kbd className="bg-white border rounded px-1">Escape</kbd> Close Modals</p>
+            </div>
           </div>
 
           {/* NEW: Download for Offline Use Button UI */}
