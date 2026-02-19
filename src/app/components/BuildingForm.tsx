@@ -609,7 +609,7 @@ export default function BuildingForm() {
       ...formData,
       '__endTime': endTime,
       '__duration': duration
-    };
+    } as Record<string, any>;
 
     const entry = { building_id: fullData['Building ID'], full_data: fullData, timestamp: endTime };
     if (isOnline) {
@@ -1101,7 +1101,7 @@ export default function BuildingForm() {
     await updateSchema(updatedSections);
   };
 
-  const editFieldOptions = async (sectionId: string, fieldId: string, newOptions: string[]) => {
+  const updateFieldOptions = async (sectionId: string, fieldId: string, newOptions: string[]) => {
     const updatedSections = sections.map(sec => {
       if (sec.id === sectionId) {
         return {
@@ -1681,7 +1681,7 @@ export default function BuildingForm() {
                     />
                     <button 
                       onClick={async () => {
-                        await editFieldOptions(editingFieldSectionId, editingFieldId, editFieldOptions);
+                        await updateFieldOptions(editingFieldSectionId, editingFieldId, editFieldOptions);
                         alert('Options updated!');
                       }}
                       className="w-full mt-2 bg-[#85144B] text-white font-bold py-2 rounded-lg text-xs"
