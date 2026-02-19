@@ -1755,6 +1755,49 @@ export default function BuildingForm() {
                             {f.allowComments && (
                                 <textarea placeholder="Add explanation or additional notes (optional)" className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#CCCCCC] focus:border-[#85144B] outline-none text-[#111111] min-h-24 resize-none" value={formData[`${f.label}_comment`] || ''} onChange={(e) => setFormData({...formData, [`${f.label}_comment`]: e.target.value})} />
                             )}
+
+                            {/* Inline Field Edit Panel */}
+                            {editingFieldId === f.id && editingFieldSectionId === section.id && isAdmin && (
+                              <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border-2 border-blue-400 shadow-lg space-y-3">
+                                <div className="flex justify-between items-center mb-2">
+                                  <h3 className="text-xs font-black text-[#001F3F]">✏️ EDIT FIELD</h3>
+                                  <div className="flex items-center gap-2">
+                                    {fieldSaveStatus === 'saving' && <span className="text-[10px] font-bold text-blue-600 animate-pulse">💾 Saving...</span>}
+                                    {fieldSaveStatus === 'saved' && <span className="text-[10px] font-bold text-green-600">✅ Saved!</span>}
+                                    <button onClick={() => { setEditingFieldId(null); setEditingFieldSectionId(null); }} className="text-slate-400 hover:text-slate-600 transition" title="Close"><X size={16}/></button>
+                                  </div>
+                                </div>
+
+                                {/* Label Editor */}
+                                <div className="bg-white p-3 rounded-lg border border-blue-200 space-y-2">
+                                  <label className="text-[10px] font-bold text-slate-700">Update Label</label>
+                                  <div className="flex gap-2">
+                                    <input type="text" value={editingFieldNewLabel} onChange={(e) => setEditingFieldNewLabel(e.target.value)} className="flex-1 p-2 border-2 border-[#AAAAAA] rounded text-xs text-black focus:border-[#85144B] outline-none" />
+                                    <button onClick={async () => { if (!editingFieldNewLabel.trim()) { alert('Field label cannot be empty'); return; } setFieldSaveStatus('saving'); await editFieldLabel(editingFieldSectionId, editingFieldId, editingFieldNewLabel); setFieldSaveStatus('saved'); setTimeout(() => setFieldSaveStatus('idle'), 2000); }} className="bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded hover:bg-blue-700 transition whitespace-nowrap">Save</button>
+                                  </div>
+                                </div>
+
+                                {/* Type Selector */}
+                                <div className="grid grid-cols-6 gap-1">
+                                  {(['text', 'number', 'select', 'checkbox', 'image', 'gps'] as FieldType[]).map(type => (
+                                    <button key={type} onClick={async () => { setFieldSaveStatus('saving'); setEditFieldType(type); await updateFieldTypeAsync(editingFieldSectionId, editingFieldId, type); setFieldSaveStatus('saved'); setTimeout(() => setFieldSaveStatus('idle'), 2000); }} className={`p-2 rounded text-[10px] font-bold border-2 transition-all ${editFieldType === type ? 'border-[#001F3F] bg-[#001F3F] text-white' : 'border-[#AAAAAA] bg-white text-[#001F3F] hover:border-[#001F3F]'}`} title={getFieldTypeLabel(type)}>{getFieldTypeIcon(type)}</button>
+                                  ))}
+                                </div>
+
+                                {/* Options for Dropdown Fields */}
+                                {(editFieldType === 'select' || editFieldType === 'multi_select') && (
+                                  <div className="bg-white p-3 rounded-lg border border-blue-200 space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-700">Options</label>
+                                    <textarea value={editFieldOptions.join(', ')} onChange={(e) => { const text = e.target.value; const parsed = text.split(',').map(o => o.trim()).filter(o => o !== ''); setEditFieldOptions(parsed); }} placeholder="Red, Blue, Green" className="w-full p-2 border-2 border-[#AAAAAA] rounded text-xs text-black resize-none h-14 focus:border-[#85144B] outline-none" />
+                                    <div className="flex flex-wrap gap-1">{editFieldOptions.map((opt, i) => <span key={i} className="bg-[#001F3F] text-white px-2 py-0.5 rounded text-[9px]">{opt}</span>)}</div>
+                                    <button onClick={async () => { if (editFieldOptions.length === 0) { alert('Add at least one option'); return; } await updateFieldOptions(editingFieldSectionId, editingFieldId, editFieldOptions); alert('✅ Options saved!'); }} className="w-full bg-[#85144B] text-white font-bold py-1 rounded text-xs hover:bg-[#6B0B3A] transition">Save Options</button>
+                                  </div>
+                                )}
+
+                                {/* Stats */}
+                                <div className="bg-white p-2 rounded text-[9px] text-slate-700 font-bold text-center border border-blue-200">📊 Used in {countFieldUsage(editingFieldId)} reports</div>
+                              </div>
+                            )}
                         </div>
                         )
                     ))}
@@ -1790,147 +1833,7 @@ export default function BuildingForm() {
           )}
 
           {/* Field Edit Modal - ENHANCED */}
-          {editingFieldId && editingFieldSectionId && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-3xl p-6 max-w-2xl w-full shadow-2xl border-4 border-[#001F3F] space-y-4 max-h-[90vh] overflow-y-auto">
-                <div className="text-[10px] font-bold text-slate-500 pb-2 border-b">
-                  Admin › Schema › {sections.find(s => s.id === editingFieldSectionId)?.title || 'Section'}
-                </div>
-                <div className="flex justify-between items-start">
-                  <h2 className="text-lg font-black text-[#001F3F]">✏️ Edit Field</h2>
-                  {fieldSaveStatus === 'saving' && <span className="text-[10px] font-bold text-blue-600 animate-pulse">💾 Saving...</span>}
-                  {fieldSaveStatus === 'saved' && <span className="text-[10px] font-bold text-green-600">✅ Saved!</span>}
-                </div>
-
-                {/* Field Label Editing */}
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Field Label</label>
-                  <input 
-                    type="text"
-                    value={editingFieldNewLabel}
-                    onChange={(e) => setEditingFieldNewLabel(e.target.value)}
-                    className="w-full p-2 border-2 border-[#AAAAAA] rounded-lg text-sm text-black focus:border-[#85144B] outline-none mb-2"
-                    placeholder="Field name"
-                  />
-                  <button
-                    onClick={async () => {
-                      if (!editingFieldNewLabel.trim()) {
-                        alert('Field label cannot be empty');
-                        return;
-                      }
-                      setFieldSaveStatus('saving');
-                      await editFieldLabel(editingFieldSectionId, editingFieldId, editingFieldNewLabel);
-                      setFieldSaveStatus('saved');
-                      setTimeout(() => setFieldSaveStatus('idle'), 2000);
-                    }}
-                    className="w-full bg-blue-600 text-white text-xs font-bold py-1 rounded hover:bg-blue-700 transition"
-                  >
-                    Update Label
-                  </button>
-                </div>
-
-                {/* Field Usage Stats */}
-                <div className="bg-slate-100 p-3 rounded-lg border border-slate-300">
-                  <p className="text-[10px] font-bold text-slate-700">📊 Field Usage: <span className="text-[#001F3F] font-black">{countFieldUsage(editingFieldId)} reports</span></p>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-2">Field Type</label>
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    {(['text', 'number', 'select', 'checkbox', 'image', 'gps'] as FieldType[]).map(type => (
-                      <button
-                        key={type}
-                        onClick={async () => {
-                          setFieldSaveStatus('saving');
-                          setEditFieldType(type);
-                          await updateFieldTypeAsync(editingFieldSectionId, editingFieldId, type);
-                          setFieldSaveStatus('saved');
-                          setTimeout(() => setFieldSaveStatus('idle'), 2000);
-                        }}
-                        className={`p-2 rounded-lg text-[10px] font-bold border-2 transition-all ${
-                          editFieldType === type
-                            ? 'border-[#001F3F] bg-[#001F3F] text-white'
-                            : 'border-[#AAAAAA] bg-white text-black hover:border-[#001F3F]'
-                        }`}
-                      >
-                        {getFieldTypeIcon(type)} {getFieldTypeLabel(type)}
-                      </button>
-                    ))}
-                  </div>
-                  <select 
-                    value={editFieldType}
-                    onChange={async (e) => {
-                      const newType = e.target.value as FieldType;
-                      setFieldSaveStatus('saving');
-                      setEditFieldType(newType);
-                      await updateFieldTypeAsync(editingFieldSectionId, editingFieldId, newType);
-                      setFieldSaveStatus('saved');
-                      setTimeout(() => setFieldSaveStatus('idle'), 2000);
-                    }}
-                    className="w-full p-2 border-2 border-[#AAAAAA] rounded-lg text-sm text-black focus:border-[#85144B]"
-                  >
-                    <option value="text">Text</option>
-                    <option value="number">Number</option>
-                    <option value="select">Dropdown</option>
-                    <option value="multi_select">Multi-Select</option>
-                    <option value="checkbox">Checkbox</option>
-                    <option value="image">Image</option>
-                    <option value="gps">GPS</option>
-                    <option value="group">Group</option>
-                    <option value="dynamic_series">Dynamic Series</option>
-                  </select>
-                </div>
-
-                {(editFieldType === 'select' || editFieldType === 'multi_select') && (
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Options (comma separated)</label>
-                    <p className="text-[10px] text-slate-500 mb-2">Example: Red, Blue, Green</p>
-                    <textarea 
-                      value={editFieldOptions.join(', ')}
-                      onChange={(e) => {
-                        setEditFieldOptions(e.target.value.split(',').map(o => o.trim()).filter(o => o !== ''));
-                      }}
-                      placeholder="Enter options separated by commas. You can add spaces!"
-                      className="w-full p-3 border-2 border-[#AAAAAA] rounded-lg text-sm text-black resize-none h-24 focus:border-[#85144B] focus:outline-none"
-                    />
-                    <div className="mt-2 p-2 bg-slate-100 rounded text-[10px] text-slate-600">
-                      <p className="font-bold mb-1">Preview:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {editFieldOptions.map((opt, i) => (
-                          <span key={i} className="bg-[#001F3F] text-white px-2 py-1 rounded text-xs">{opt}</span>
-                        ))}
-                      </div>
-                    </div>
-                    <button 
-                      onClick={async () => {
-                        if (editFieldOptions.length === 0) {
-                          alert('Please add at least one option');
-                          return;
-                        }
-                        await updateFieldOptions(editingFieldSectionId, editingFieldId, editFieldOptions);
-                        alert('✅ Options updated!');
-                      }}
-                      className="w-full mt-3 bg-[#85144B] text-white font-bold py-2 rounded-lg text-xs hover:bg-[#6B0B3A] transition-colors"
-                    >
-                      💾 Save Options
-                    </button>
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => {
-                      setEditingFieldId(null);
-                      setEditingFieldSectionId(null);
-                    }}
-                    className="flex-1 bg-slate-300 text-black font-bold py-2 rounded-lg text-xs hover:bg-slate-400"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Field edit panel now renders inline below fields */}
 
           {/* New Survey / Keyboard Shortcuts */}
           <div className="space-y-3 mb-4">
