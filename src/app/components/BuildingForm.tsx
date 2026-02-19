@@ -301,7 +301,6 @@ export default function BuildingForm() {
 
   const [dependsOnConditionType, setDependsOnConditionType] = useState<'equals' | 'notCaptured' | 'countGreaterThan' | 'isEmpty'>('equals');
   const [dependsOnTriggerCount, setDependsOnTriggerCount] = useState<number>(0);
-  const [newFieldAllowComments, setNewFieldAllowComments] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>('admin');
   const [showExportImport, setShowExportImport] = useState(false);
