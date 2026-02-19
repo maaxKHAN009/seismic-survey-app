@@ -329,6 +329,134 @@ export default function BuildingForm() {
   const [editingFieldSectionId, setEditingFieldSectionId] = useState<string | null>(null);
   const [editFieldType, setEditFieldType] = useState<FieldType>('text');
   const [editFieldOptions, setEditFieldOptions] = useState<string[]>([]);
+  const [editingFieldNewLabel, setEditingFieldNewLabel] = useState('');
+  const [fieldSaveStatus, setFieldSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  // UI Enhancement state variables
+  const [fieldSearchQuery, setFieldSearchQuery] = useState('');
+  const [bulkSelectedFields, setBulkSelectedFields] = useState<Set<string>>(new Set());
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [editingFieldSectionIndex, setEditingFieldSectionIndex] = useState<number | null>(null);
+
+
+  // ========== HELPER FUNCTIONS FOR UI ENHANCEMENTS ==========
+  const getFieldTypeColor = (type: FieldType): string => {
+    const colors: Record<FieldType, string> = {
+      text: 'bg-blue-50 border-blue-200',
+      number: 'bg-purple-50 border-purple-200',
+      select: 'bg-green-50 border-green-200',
+      multi_select: 'bg-emerald-50 border-emerald-200',
+      checkbox: 'bg-yellow-50 border-yellow-200',
+      image: 'bg-orange-50 border-orange-200',
+      gps: 'bg-pink-50 border-pink-200',
+      group: 'bg-indigo-50 border-indigo-200',
+      dynamic_series: 'bg-cyan-50 border-cyan-200'
+    };
+    return colors[type];
+  };
+
+  const getFieldTypeIcon = (type: FieldType): string => {
+    const icons: Record<FieldType, string> = {
+      text: '📝',
+      number: '🔢',
+      select: '📋',
+      multi_select: '☑️',
+      checkbox: '✓',
+      image: '📷',
+      gps: '📍',
+      group: '📦',
+      dynamic_series: '📊'
+    };
+    return icons[type];
+  };
+
+  const getFieldTypeLabel = (type: FieldType): string => {
+    const labels: Record<FieldType, string> = {
+      text: 'Text',
+      number: 'Number',
+      select: 'Dropdown',
+      multi_select: 'Multi-Select',
+      checkbox: 'Checkbox',
+      image: 'Photo',
+      gps: 'GPS',
+      group: 'Group',
+      dynamic_series: 'Dynamic Series'
+    };
+    return labels[type];
+  };
+
+  const countFieldUsage = (fieldId: string): number => {
+    let count = 0;
+    reports.forEach(report => {
+      const field = sections.flatMap(s => s.fields).find(f => f.id === fieldId);
+      if (field && report.full_data[field.label] !== undefined && report.full_data[field.label] !== '' && report.full_data[field.label] !== null) {
+        count++;
+      }
+    });
+    return count;
+  };
+
+  const getFieldsInSection = (sectionId: string): CustomField[] => {
+    const section = sections.find(s => s.id === sectionId);
+    return section ? section.fields : [];
+  };
+
+  const quickAddField = async (type: FieldType, baseLabel: string) => {
+    if (!targetSectionId) {
+      alert('Please select a section first');
+      return;
+    }
+    const newFieldId = Date.now().toString();
+    const newField: CustomField = {
+      id: newFieldId,
+      label: baseLabel,
+      type,
+      tooltip: 'Observation required.',
+      required: false,
+      allowComments: false,
+      options: (type === 'select' || type === 'multi_select') ? ['Option 1', 'Option 2'] : undefined
+    };
+    const updatedSections = sections.map(sec => 
+      sec.id === targetSectionId ? { ...sec, fields: [...sec.fields, newField] } : sec
+    );
+    await updateSchema(updatedSections);
+  };
+
+  const bulkUpdateFieldType = async (newType: FieldType) => {
+    if (bulkSelectedFields.size === 0) return;
+    const updatedSections = sections.map(section => ({
+      ...section,
+      fields: section.fields.map(field => {
+        if (bulkSelectedFields.has(field.id)) {
+          return {
+            ...field,
+            type: newType,
+            options: (newType === 'select' || newType === 'multi_select') ? field.options || [] : undefined
+          };
+        }
+        return field;
+      })
+    }));
+    await updateSchema(updatedSections);
+    setBulkSelectedFields(new Set());
+    alert(`✅ Updated ${bulkSelectedFields.size} fields to ${getFieldTypeLabel(newType)}`);
+  };
+
+  const bulkToggleRequired = async () => {
+    if (bulkSelectedFields.size === 0) return;
+    const updatedSections = sections.map(section => ({
+      ...section,
+      fields: section.fields.map(field => {
+        if (bulkSelectedFields.has(field.id)) {
+          return { ...field, required: !field.required };
+        }
+        return field;
+      })
+    }));
+    await updateSchema(updatedSections);
+    setBulkSelectedFields(new Set());
+    alert(`✅ Toggled required status for ${bulkSelectedFields.size} fields`);
+  };
 
   const checkPending = async () => {
     if (localDB && localDB.outbox) {
@@ -1114,6 +1242,15 @@ export default function BuildingForm() {
     await updateSchema(updatedSections);
   };
 
+  const openFieldEditModal = (fieldId: string, sectionId: string, fieldType: FieldType, fieldOptions?: string[], fieldLabel?: string) => {
+    setEditingFieldId(fieldId);
+    setEditingFieldSectionId(sectionId);
+    setEditFieldType(fieldType);
+    setEditFieldOptions(fieldOptions || []);
+    setEditingFieldNewLabel(fieldLabel || '');
+    setFieldSaveStatus('idle');
+  };
+
   const editFieldLabel = async (sectionId: string, fieldId: string, newLabel: string) => {
     if (!newLabel.trim()) return;
     const updatedSections = sections.map(sec => {
@@ -1338,6 +1475,19 @@ export default function BuildingForm() {
                     {sections.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                 </select>
 
+                {/* Quick-Add Field Buttons */}
+                <div className="bg-black/20 p-4 rounded-xl">
+                  <p className="text-[10px] font-bold text-[#39CCCC] mb-3">⚡ Quick Add:</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button onClick={() => quickAddField('text', 'New Text Field')} className="bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold py-2 px-3 rounded transition">📝 Text</button>
+                    <button onClick={() => quickAddField('select', 'New Dropdown')} className="bg-green-500 hover:bg-green-600 text-white text-[10px] font-bold py-2 px-3 rounded transition">📋 Dropdown</button>
+                    <button onClick={() => quickAddField('image', 'New Photos')} className="bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-bold py-2 px-3 rounded transition">📷 Photos</button>
+                    <button onClick={() => quickAddField('number', 'New Number')} className="bg-purple-500 hover:bg-purple-600 text-white text-[10px] font-bold py-2 px-3 rounded transition">🔢 Number</button>
+                    <button onClick={() => quickAddField('gps', 'Location')} className="bg-pink-500 hover:bg-pink-600 text-white text-[10px] font-bold py-2 px-3 rounded transition">📍 GPS</button>
+                    <button onClick={() => quickAddField('checkbox', 'New Checkbox')} className="bg-yellow-500 hover:bg-yellow-600 text-white text-[10px] font-bold py-2 px-3 rounded transition">☑️ Check</button>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                     <input type="text" placeholder="Field Label" className="p-3 bg-white/10 rounded-xl text-xs font-bold border border-white/10 text-white" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
                     <select className="p-3 bg-white rounded-xl text-xs font-bold text-black" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
@@ -1514,7 +1664,7 @@ export default function BuildingForm() {
                                 </label>
                                 {isAdmin && (
                                     <div className="flex gap-2">
-                                        <button onClick={() => { setEditingFieldId(f.id); setEditingFieldSectionId(section.id); setEditFieldType(f.type); setEditFieldOptions(f.options || []); }} title="Edit Field" className="text-slate-300 hover:text-yellow-500"><PenTool size={14}/></button>
+                                        <button onClick={() => openFieldEditModal(f.id, section.id, f.type, f.options)} title="Edit Field" className="text-slate-300 hover:text-yellow-500"><PenTool size={14}/></button>
                                         <button onClick={() => toggleFieldRequired(section.id, f.id)} title={f.required ? 'Remove Required' : 'Mark Required'} className={`transition-colors p-1 ${f.required ? 'text-red-500 bg-red-50 rounded' : 'text-slate-300 hover:text-orange-500'}`}><CheckSquare size={14}/></button>
                                         <button onClick={() => toggleFieldAllowComments(section.id, f.id)} title={f.allowComments ? 'Disable Comments' : 'Allow Comments'} className={`transition-colors p-1 ${f.allowComments ? 'text-blue-500 bg-blue-50 rounded' : 'text-slate-300 hover:text-blue-500'}`}>💬</button>
                                         <button onClick={() => moveField(section.id, fIdx, 'up')} className="text-slate-300 hover:text-blue-500"><ArrowUp size={14}/></button>
@@ -1639,22 +1789,85 @@ export default function BuildingForm() {
             </div>
           )}
 
-          {/* Field Edit Modal */}
+          {/* Field Edit Modal - ENHANCED */}
           {editingFieldId && editingFieldSectionId && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border-4 border-[#001F3F] space-y-4 max-h-96 overflow-y-auto">
-                <h2 className="text-lg font-black text-[#001F3F]">✏️ Edit Field</h2>
-                
+              <div className="bg-white rounded-3xl p-6 max-w-2xl w-full shadow-2xl border-4 border-[#001F3F] space-y-4 max-h-[90vh] overflow-y-auto">
+                <div className="text-[10px] font-bold text-slate-500 pb-2 border-b">
+                  Admin › Schema › {sections.find(s => s.id === editingFieldSectionId)?.title || 'Section'}
+                </div>
+                <div className="flex justify-between items-start">
+                  <h2 className="text-lg font-black text-[#001F3F]">✏️ Edit Field</h2>
+                  {fieldSaveStatus === 'saving' && <span className="text-[10px] font-bold text-blue-600 animate-pulse">💾 Saving...</span>}
+                  {fieldSaveStatus === 'saved' && <span className="text-[10px] font-bold text-green-600">✅ Saved!</span>}
+                </div>
+
+                {/* Field Label Editing */}
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Field Label</label>
+                  <input 
+                    type="text"
+                    value={editingFieldNewLabel}
+                    onChange={(e) => setEditingFieldNewLabel(e.target.value)}
+                    className="w-full p-2 border-2 border-[#AAAAAA] rounded-lg text-sm text-black focus:border-[#85144B] outline-none mb-2"
+                    placeholder="Field name"
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!editingFieldNewLabel.trim()) {
+                        alert('Field label cannot be empty');
+                        return;
+                      }
+                      setFieldSaveStatus('saving');
+                      await editFieldLabel(editingFieldSectionId, editingFieldId, editingFieldNewLabel);
+                      setFieldSaveStatus('saved');
+                      setTimeout(() => setFieldSaveStatus('idle'), 2000);
+                    }}
+                    className="w-full bg-blue-600 text-white text-xs font-bold py-1 rounded hover:bg-blue-700 transition"
+                  >
+                    Update Label
+                  </button>
+                </div>
+
+                {/* Field Usage Stats */}
+                <div className="bg-slate-100 p-3 rounded-lg border border-slate-300">
+                  <p className="text-[10px] font-bold text-slate-700">📊 Field Usage: <span className="text-[#001F3F] font-black">{countFieldUsage(editingFieldId)} reports</span></p>
+                </div>
+
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Field Type</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-2">Field Type</label>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {(['text', 'number', 'select', 'checkbox', 'image', 'gps'] as FieldType[]).map(type => (
+                      <button
+                        key={type}
+                        onClick={async () => {
+                          setFieldSaveStatus('saving');
+                          setEditFieldType(type);
+                          await updateFieldTypeAsync(editingFieldSectionId, editingFieldId, type);
+                          setFieldSaveStatus('saved');
+                          setTimeout(() => setFieldSaveStatus('idle'), 2000);
+                        }}
+                        className={`p-2 rounded-lg text-[10px] font-bold border-2 transition-all ${
+                          editFieldType === type
+                            ? 'border-[#001F3F] bg-[#001F3F] text-white'
+                            : 'border-[#AAAAAA] bg-white text-black hover:border-[#001F3F]'
+                        }`}
+                      >
+                        {getFieldTypeIcon(type)} {getFieldTypeLabel(type)}
+                      </button>
+                    ))}
+                  </div>
                   <select 
                     value={editFieldType}
                     onChange={async (e) => {
                       const newType = e.target.value as FieldType;
+                      setFieldSaveStatus('saving');
                       setEditFieldType(newType);
                       await updateFieldTypeAsync(editingFieldSectionId, editingFieldId, newType);
+                      setFieldSaveStatus('saved');
+                      setTimeout(() => setFieldSaveStatus('idle'), 2000);
                     }}
-                    className="w-full p-2 border-2 border-[#AAAAAA] rounded-lg text-sm text-black"
+                    className="w-full p-2 border-2 border-[#AAAAAA] rounded-lg text-sm text-black focus:border-[#85144B]"
                   >
                     <option value="text">Text</option>
                     <option value="number">Number</option>
@@ -1671,22 +1884,35 @@ export default function BuildingForm() {
                 {(editFieldType === 'select' || editFieldType === 'multi_select') && (
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">Options (comma separated)</label>
+                    <p className="text-[10px] text-slate-500 mb-2">Example: Red, Blue, Green</p>
                     <textarea 
                       value={editFieldOptions.join(', ')}
                       onChange={(e) => {
-                        const opts = e.target.value.split(',').map(o => o.trim()).filter(o => o);
-                        setEditFieldOptions(opts);
+                        setEditFieldOptions(e.target.value.split(',').map(o => o.trim()).filter(o => o !== ''));
                       }}
-                      className="w-full p-2 border-2 border-[#AAAAAA] rounded-lg text-sm text-black resize-none h-20"
+                      placeholder="Enter options separated by commas. You can add spaces!"
+                      className="w-full p-3 border-2 border-[#AAAAAA] rounded-lg text-sm text-black resize-none h-24 focus:border-[#85144B] focus:outline-none"
                     />
+                    <div className="mt-2 p-2 bg-slate-100 rounded text-[10px] text-slate-600">
+                      <p className="font-bold mb-1">Preview:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {editFieldOptions.map((opt, i) => (
+                          <span key={i} className="bg-[#001F3F] text-white px-2 py-1 rounded text-xs">{opt}</span>
+                        ))}
+                      </div>
+                    </div>
                     <button 
                       onClick={async () => {
+                        if (editFieldOptions.length === 0) {
+                          alert('Please add at least one option');
+                          return;
+                        }
                         await updateFieldOptions(editingFieldSectionId, editingFieldId, editFieldOptions);
-                        alert('Options updated!');
+                        alert('✅ Options updated!');
                       }}
-                      className="w-full mt-2 bg-[#85144B] text-white font-bold py-2 rounded-lg text-xs"
+                      className="w-full mt-3 bg-[#85144B] text-white font-bold py-2 rounded-lg text-xs hover:bg-[#6B0B3A] transition-colors"
                     >
-                      Save Options
+                      💾 Save Options
                     </button>
                   </div>
                 )}
