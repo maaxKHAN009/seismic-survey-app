@@ -12,8 +12,8 @@ import { saveAs } from 'file-saver';
 import { 
   Info, Database, Settings, PlusCircle, Trash2, 
   X, CheckSquare, Camera, ChevronRight, FileDown, 
-  Filter, Square, CheckSquare as CheckIcon, Search, Eye, Tag, Wifi, WifiOff, RefreshCcw, 
-  LayoutGrid, ListFilter, Edit3, ArrowLeft, ArrowRight, AlertTriangle, Layers, MapPin, Loader2, PenTool, Grip, ArrowUp, ArrowDown, Plus, HardDrive
+  Filter, Search, Eye, Tag, Wifi, WifiOff, RefreshCcw, 
+  Edit3, ArrowRight, AlertTriangle, Layers, MapPin, Loader2, PenTool, Grip, ArrowUp, ArrowDown, Plus, HardDrive
 } from 'lucide-react';
 
 // --- Offline Database Schema (Dexie) ---
@@ -276,7 +276,6 @@ export default function BuildingForm() {
   const [reports, setReports] = useState<BuildingReport[]>([]);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [editingReport, setEditingReport] = useState<BuildingReport | null>(null);
   const [viewingImages, setViewingImages] = useState<ImageObject[] | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -324,7 +323,6 @@ export default function BuildingForm() {
   const [showSurveyorModal, setShowSurveyorModal] = useState(false);
   const [tempSurveyorName, setTempSurveyorName] = useState('');
   const [surveyStartTime, setSurveyStartTime] = useState<number | null>(null);
-  const [surveyEndTime, setSurveyEndTime] = useState<number | null>(null);
 
   // Field editing state
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
@@ -1081,7 +1079,7 @@ export default function BuildingForm() {
     await updateSchema(updatedSections);
   };
 
-  const editFieldType = async (sectionId: string, fieldId: string, newType: FieldType) => {
+  const updateFieldTypeAsync = async (sectionId: string, fieldId: string, newType: FieldType) => {
     const updatedSections = sections.map(sec => {
       if (sec.id === sectionId) {
         return {
@@ -1654,7 +1652,7 @@ export default function BuildingForm() {
                     onChange={async (e) => {
                       const newType = e.target.value as FieldType;
                       setEditFieldType(newType);
-                      await editFieldType(editingFieldSectionId, editingFieldId, newType);
+                      await updateFieldTypeAsync(editingFieldSectionId, editingFieldId, newType);
                     }}
                     className="w-full p-2 border-2 border-[#AAAAAA] rounded-lg text-sm text-black"
                   >
