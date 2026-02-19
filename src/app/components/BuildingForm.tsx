@@ -4,6 +4,7 @@
 // 1. IMPORTS & CONFIGURATION
 // ==========================================
 import { supabase } from '@/lib/supabase';
+import { PROFORMA_SECTIONS } from '@/proforma_schema';
 import React, { useState, useEffect, useRef } from 'react';
 import Dexie, { type Table } from 'dexie';
 import ExcelJS from 'exceljs';
@@ -81,15 +82,7 @@ interface BuildingReport {
   full_data: Record<string, any>; 
 }
 
-const DEFAULT_SECTIONS: Section[] = [
-  {
-    id: 'sec_ident', title: '1. Identification',
-    fields: [
-      { id: 'f_id', label: 'Building ID', type: 'text', tooltip: 'Unique Code', required: true },
-      { id: 'f_date', label: 'Survey Date', type: 'text', tooltip: 'DD/MM/YYYY', required: true },
-    ]
-  }
-];
+const DEFAULT_SECTIONS: Section[] = PROFORMA_SECTIONS as Section[];
 
 // ==========================================
 // 2. SUB-COMPONENTS
