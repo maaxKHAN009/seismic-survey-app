@@ -1,0 +1,891 @@
+[
+  {
+    "id": "identification",
+    "title": "1. IDENTIFICATION & LOCATION",
+    "fields": [
+      {
+        "id": "building_id",
+        "label": "Building ID",
+        "type": "text",
+        "tooltip": "Unique identifier",
+        "required": true
+      },
+      {
+        "id": "survey_date",
+        "label": "Survey Date",
+        "type": "text",
+        "tooltip": "DD/MM/YYYY",
+        "autoDate": true,
+        "required": true
+      },
+      {
+        "id": "surveyor_name",
+        "label": "Surveyor Name",
+        "type": "text",
+        "tooltip": "Name of surveyor",
+        "required": true
+      },
+      {
+        "id": "district",
+        "label": "District / Tehsil",
+        "type": "select",
+        "tooltip": "",
+        "required": true,
+        "options": [
+          "Upper Dir",
+          "Chitral",
+          "Shangla",
+          "Mansehra",
+          "Battagram",
+          "Torghar",
+          "Kohistan"
+        ]
+      },
+      {
+        "id": "village",
+        "label": "Village / Locality",
+        "type": "text",
+        "tooltip": ""
+      },
+      {
+        "id": "gps_coords",
+        "label": "GPS Coordinates",
+        "type": "gps",
+        "tooltip": "Latitude, Longitude",
+        "required": true
+      },
+      {
+        "id": "ground_type",
+        "label": "Building is constructed on:",
+        "type": "select",
+        "options": [
+          "Flat ground",
+          "Gentle slope",
+          "Steep slope",
+          "Valley"
+        ],
+        "tooltip": "",
+        "required": true
+      },
+      {
+        "id": "adjacent_buildings",
+        "label": "Surrounded by adjacent buildings?",
+        "type": "select",
+        "options": [
+          "Yes, attached on one or more sides",
+          "No, detached building"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "natural_hazards",
+        "label": "Exposed to natural hazards? (Select all)",
+        "type": "multi_select",
+        "options": [
+          "Earthquake",
+          "Flood",
+          "Landslide"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "construction_period",
+        "label": "Construction period relative to 2005 Kashmir Earthquake:",
+        "type": "select",
+        "options": [
+          "Post Kashmir EQ (after 2005)",
+          "Pre-Kashmir EQ (before 2005)"
+        ],
+        "tooltip": "",
+        "required": true
+      },
+      {
+        "id": "current_use",
+        "label": "Current Use of the building:",
+        "type": "select",
+        "options": [
+          "Residential",
+          "Commercial",
+          "Religious",
+          "Mixed",
+          "Public",
+          "Storage",
+          "Other"
+        ],
+        "tooltip": "",
+        "required": true
+      },
+      {
+        "id": "construction_age",
+        "label": "Estimated Construction Age:",
+        "type": "select",
+        "options": [
+          "<10 yrs",
+          "10–30 yrs",
+          "30–60 yrs",
+          "60–100 yrs",
+          ">100 yrs"
+        ],
+        "tooltip": "",
+        "required": true
+      },
+      {
+        "id": "occupancy_status",
+        "label": "Occupancy Status:",
+        "type": "select",
+        "options": [
+          "Occupied",
+          "Partial",
+          "Vacant",
+          "Seasonal"
+        ],
+        "tooltip": "",
+        "required": true
+      }
+    ]
+  },
+  {
+    "id": "structural_system",
+    "title": "2. STRUCTURAL SYSTEM & TYPOLOGY",
+    "fields": [
+      {
+        "id": "1771581778439",
+        "label": "Building Dimension",
+        "type": "group",
+        "tooltip": "Observation required.",
+        "subFields": [
+          {
+            "id": "sub_1771581765183",
+            "label": "Longitudinal Dimension (ft)",
+            "type": "number"
+          },
+          {
+            "id": "sub_1771581775679",
+            "label": "Transverse Dimension (ft)",
+            "type": "number"
+          }
+        ],
+        "required": true,
+        "allowComments": true,
+        "autoDate": false
+      },
+      {
+        "id": "1771581866631",
+        "label": "Total Number Of Openings (Doors + Windows) in Longitudinal Walls",
+        "type": "dynamic_series",
+        "tooltip": "Observation required.",
+        "required": true,
+        "allowComments": true,
+        "autoDate": false
+      },
+      {
+        "id": "1771581889295",
+        "label": "Total Number Of Openings (Doors + Windows) in Transverse Walls",
+        "type": "dynamic_series",
+        "tooltip": "Observation required.",
+        "required": true,
+        "allowComments": true,
+        "autoDate": false
+      },
+      {
+        "id": "total_covered_area",
+        "label": "Total covered area [sq ft]",
+        "type": "number",
+        "tooltip": "",
+        "required": true
+      },
+      {
+        "id": "lateral_resisting_system",
+        "label": "Primary Lateral Resisting System:",
+        "type": "select",
+        "options": [
+          "URM masonry",
+          "Confined masonry",
+          "RC Frame",
+          "Other"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "wall_junction_toothing",
+        "label": "Wall Junction Toothing:",
+        "type": "select",
+        "options": [
+          "Proper",
+          "Partial",
+          "None",
+          "Not visible"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "1771581985823",
+        "label": "Number Of Stories",
+        "type": "dynamic_series",
+        "tooltip": "Observation required.",
+        "required": true,
+        "allowComments": true,
+        "autoDate": false
+      },
+      {
+        "id": "plan_shape",
+        "label": "Plan Shape:",
+        "type": "select",
+        "options": [
+          "Rectangular",
+          "Square",
+          "L-shape",
+          "Irregular"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      }
+    ]
+  },
+  {
+    "id": "wall_system",
+    "title": "3. WALL SYSTEM",
+    "fields": [
+      {
+        "id": "external_wall_thickness",
+        "label": "External Wall thickness [inches]",
+        "type": "number",
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "internal_wall_thickness",
+        "label": "Internal Wall thickness [inches]",
+        "type": "number",
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "main_wall_material",
+        "label": "Main material used to build the walls:",
+        "type": "select",
+        "options": [
+          "Random Rubble Stone",
+          "Course Rubble Stone",
+          "Semi-Dressed stone",
+          "Solid block",
+          "Hollow block",
+          "Adobe",
+          "Other"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "mortar_type",
+        "label": "Type of mortar used:",
+        "type": "select",
+        "options": [
+          "Mud mortar",
+          "Lime mortar",
+          "Cement sand mortar",
+          "Other"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "mortar_condition",
+        "label": "Condition of the Mortar:",
+        "type": "select",
+        "options": [
+          "Good",
+          "Weathered",
+          "Eroded",
+          "Missing"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "through_stones",
+        "label": "Provision of through stones in the wall:",
+        "type": "select",
+        "options": [
+          "Regular",
+          "Irregular",
+          "None",
+          "N/A"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      }
+    ]
+  },
+  {
+    "id": "openings",
+    "title": "4. OPENINGS",
+    "fields": [
+      {
+        "id": "lintel_type",
+        "label": "Lintel type:",
+        "type": "select",
+        "options": [
+          "Timber",
+          "Stone",
+          "RC",
+          "None",
+          "NA"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "opening_alignment",
+        "label": "Opening alignment in vertical direction:",
+        "type": "select",
+        "options": [
+          "Aligned",
+          "Staggered"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      }
+    ]
+  },
+  {
+    "id": "horizontal_bands",
+    "title": "5. HORIZONTAL BANDS",
+    "fields": [
+      {
+        "id": "bands_present",
+        "label": "Which bands are present? (Select all)",
+        "type": "multi_select",
+        "options": [
+          "Plinth band",
+          "Sill band",
+          "Lintel band",
+          "Roof band",
+          "None"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "bands_material",
+        "label": "Material used in bands:",
+        "type": "select",
+        "options": [
+          "Reinforced concrete (RCC)",
+          "Wood",
+          "Steel",
+          "Mixed",
+          "N/A"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      }
+    ]
+  },
+  {
+    "id": "structural_connections",
+    "title": "6. STRUCTURAL CONNECTIONS",
+    "fields": [
+      {
+        "id": "roof_wall_connection",
+        "label": "Roof-to-wall Connection:",
+        "type": "select",
+        "options": [
+          "Bearing (simply resting on wall)",
+          "Adequately anchored (nailed/bolted/wired down)",
+          "Not anchored (loose)"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "floor_wall_connection",
+        "label": "Floor-to-wall:",
+        "type": "select",
+        "options": [
+          "Bearing (simply resting on wall)",
+          "Adequately anchored (nailed/bolted/wired down)",
+          "Not anchored (loose)"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "wall_wall_connection",
+        "label": "Wall-to-wall connection:",
+        "type": "select",
+        "options": [
+          "Proper",
+          "Partial",
+          "Poor"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      }
+    ]
+  },
+  {
+    "id": "floor_system",
+    "title": "7. FLOOR SYSTEM",
+    "fields": [
+      {
+        "id": "floor_material",
+        "label": "Floor Material:",
+        "type": "select",
+        "options": [
+          "Earth",
+          "Timber",
+          "RC",
+          "Other"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      }
+    ]
+  },
+  {
+    "id": "roof_system",
+    "title": "8. ROOF SYSTEM",
+    "fields": [
+      {
+        "id": "roof_type",
+        "label": "Roof Type:",
+        "type": "select",
+        "options": [
+          "Flat",
+          "Sloped",
+          "Gable"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "roof_material",
+        "label": "Roof Material:",
+        "type": "select",
+        "options": [
+          "Timber + mud",
+          "RC slab",
+          "Wooden truss",
+          "Steel truss",
+          "Inverted T roof with brick",
+          "Mixed"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      }
+    ]
+  },
+  {
+    "id": "non_structural",
+    "title": "9. NON-STRUCTURAL ELEMENTS",
+    "fields": [
+      {
+        "id": "parapet_wall",
+        "label": "Does the building have a parapet wall?",
+        "type": "select",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "1771582297479",
+        "label": "Parapet Wall Height (ft)",
+        "type": "number",
+        "tooltip": "Observation required.",
+        "required": true,
+        "allowComments": true,
+        "autoDate": false,
+        "dependsOn": {
+          "fieldId": "parapet_wall",
+          "conditionType": "equals",
+          "triggerValues": [
+            "Yes"
+          ]
+        }
+      },
+      {
+        "id": "1771582328728",
+        "label": "Parapet Wall Thickness (inches)",
+        "type": "number",
+        "tooltip": "Observation required.",
+        "required": true,
+        "allowComments": true,
+        "autoDate": false,
+        "dependsOn": {
+          "fieldId": "parapet_wall",
+          "conditionType": "equals",
+          "triggerValues": [
+            "Yes"
+          ]
+        }
+      },
+      {
+        "id": "1771582423832",
+        "label": "Parapet Wall Material",
+        "type": "select",
+        "tooltip": "Observation required.",
+        "options": [
+          "Same as main wall",
+          "Brick",
+          "Stone",
+          "Other"
+        ],
+        "required": true,
+        "allowComments": true,
+        "autoDate": false,
+        "dependsOn": {
+          "fieldId": "parapet_wall",
+          "conditionType": "equals",
+          "triggerValues": [
+            "Yes"
+          ]
+        }
+      },
+      {
+        "id": "boundary_wall",
+        "label": "Does the building have a boundary wall?",
+        "type": "select",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      }
+    ]
+  },
+  {
+    "id": "foundation_plinth",
+    "title": "10. FOUNDATION & PLINTH",
+    "fields": [
+      {
+        "id": "foundation_type",
+        "label": "Foundation Type:",
+        "type": "select",
+        "options": [
+          "Strip footing",
+          "Isolated footing",
+          "Stone plinth",
+          "Rubble trench",
+          "Stepped foundation",
+          "RCC raft",
+          "Not visible"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "foundation_material",
+        "label": "Foundation Material:",
+        "type": "select",
+        "options": [
+          "Random rubble masonry",
+          "Coursed rubble masonry",
+          "Brick masonry",
+          "RC",
+          "PCC",
+          "Mixed",
+          "Not visible"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "foundation_depth",
+        "label": "Foundation Depth below Ground Level [ft]:",
+        "type": "number",
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "foundation_width",
+        "label": "Foundation Width (at base) [inches]:",
+        "type": "number",
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "foundation_condition",
+        "label": "Foundation Condition:",
+        "type": "select",
+        "options": [
+          "Sound / No visible distress",
+          "Minor cracking",
+          "Major cracking",
+          "Settlement observed",
+          "Scour / erosion visible",
+          "Vegetation growth",
+          "Not visible"
+        ],
+        "tooltip": "",
+        "required": true
+      },
+      {
+        "id": "plinth_material",
+        "label": "Plinth / Base Material:",
+        "type": "select",
+        "options": [
+          "Stone masonry",
+          "Brick masonry",
+          "RCC",
+          "PCC",
+          "Mixed"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "plinth_height",
+        "label": "Plinth Height Above Ground Level [inches]:",
+        "type": "number",
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "dpc_present",
+        "label": "Damp Proof Course (DPC) Present?",
+        "type": "select",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "1771582746192",
+        "label": "DPC Material",
+        "type": "select",
+        "tooltip": "Observation required.",
+        "options": [
+          "Bitumen",
+          "Plastic Sheet",
+          "Cement Mortar",
+          "Stone Slab",
+          "Other"
+        ],
+        "required": true,
+        "allowComments": true,
+        "autoDate": false,
+        "dependsOn": {
+          "fieldId": "dpc_present",
+          "conditionType": "equals",
+          "triggerValues": [
+            "Yes"
+          ]
+        }
+      },
+      {
+        "id": "soil_type",
+        "label": "Soil Type around Foundation:",
+        "type": "select",
+        "options": [
+          "Rocky",
+          "Gravel",
+          "Sandy",
+          "Clayey",
+          "Silty",
+          "Mixed"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "slope_drainage",
+        "label": "Slope / Drainage around Foundation:",
+        "type": "select",
+        "options": [
+          "Proper drainage away from building",
+          "Water pooling near foundation",
+          "Erosion visible",
+          "Not applicable (flat site)"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "foundation_erosion",
+        "label": "Is foundation exposed / vulnerable to erosion?",
+        "type": "select",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "tooltip": "",
+        "required": true
+      },
+      {
+        "id": "1771582876304",
+        "label": "Describe the Exposure or Vulnerability",
+        "type": "text",
+        "tooltip": "Observation required.",
+        "required": true,
+        "allowComments": false,
+        "autoDate": false,
+        "dependsOn": {
+          "fieldId": "foundation_erosion",
+          "conditionType": "equals",
+          "triggerValues": [
+            "Yes"
+          ]
+        }
+      },
+      {
+        "id": "foundation_remarks",
+        "label": "Remarks on foundation:",
+        "type": "text",
+        "tooltip": "",
+        "allowComments": true,
+        "required": true
+      }
+    ]
+  },
+  {
+    "id": "past_intervention",
+    "title": "11. PAST INTERVENTION AND DAMAGES",
+    "fields": [
+      {
+        "id": "past_intervention",
+        "label": "Has the building undergone any past intervention/repair?",
+        "type": "select",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "1771582976600",
+        "label": "If Yes, Please Specify",
+        "type": "text",
+        "tooltip": "Observation required.",
+        "required": true,
+        "allowComments": false,
+        "autoDate": false,
+        "dependsOn": {
+          "fieldId": "past_intervention",
+          "conditionType": "equals",
+          "triggerValues": [
+            "Yes"
+          ]
+        }
+      },
+      {
+        "id": "observed_damages",
+        "label": "Observed damage type(s): (Select all)",
+        "type": "multi_select",
+        "options": [
+          "Foundation settlement",
+          "Corner separation",
+          "Wall cracking",
+          "Wall bulging",
+          "Roof damage",
+          "Other"
+        ],
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "1771583033112",
+        "label": "If Other, then Describe",
+        "type": "text",
+        "tooltip": "Observation required.",
+        "required": true,
+        "allowComments": false,
+        "autoDate": false,
+        "dependsOn": {
+          "fieldId": "observed_damages",
+          "conditionType": "equals",
+          "triggerValues": [
+            "Other"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "documentation",
+    "title": "12. DOCUMENTATION",
+    "fields": [
+      {
+        "id": "sketch_attached",
+        "label": "Sketches",
+        "type": "image",
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "elevations_attached",
+        "label": "Elevations",
+        "type": "image",
+        "tooltip": "",
+        "required": true,
+        "allowComments": true
+      },
+      {
+        "id": "photos_captured",
+        "label": "Other Related Photos",
+        "type": "image",
+        "tooltip": ""
+      }
+    ]
+  },
+  {
+    "id": "remarks",
+    "title": "13. REMARKS",
+    "fields": [
+      {
+        "id": "general_remarks",
+        "label": "General Remarks:",
+        "type": "text",
+        "tooltip": "",
+        "allowComments": false,
+        "required": true
+      }
+    ]
+  }
+]

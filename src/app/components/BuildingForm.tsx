@@ -28,7 +28,7 @@ class SeismicDB extends Dexie {
 const localDB = new SeismicDB();
 
 // --- Types ---
-type FieldType = 'text' | 'number' | 'select' | 'checkbox' | 'image' | 'gps' | 'group' | 'multi_select' | 'dynamic_series';
+type FieldType = 'text' | 'number' | 'select' | 'checkbox' | 'image' | 'gps' | 'group' | 'multi_select' | 'dynamic_series' | 'date';
 type SubFieldType = 'text' | 'number' | 'select' | 'checkbox';
 
 interface SubField {
@@ -336,6 +336,7 @@ export default function BuildingForm() {
   const getFieldTypeColor = (type: FieldType): string => {
     const colors: Record<FieldType, string> = {
       text: 'bg-blue-50 border-blue-200',
+      date: 'bg-cyan-50 border-cyan-200',
       number: 'bg-purple-50 border-purple-200',
       select: 'bg-green-50 border-green-200',
       multi_select: 'bg-emerald-50 border-emerald-200',
@@ -351,6 +352,7 @@ export default function BuildingForm() {
   const getFieldTypeIcon = (type: FieldType): string => {
     const icons: Record<FieldType, string> = {
       text: '📝',
+      date: '📅',
       number: '🔢',
       select: '📋',
       multi_select: '☑️',
@@ -373,7 +375,8 @@ export default function BuildingForm() {
       image: 'Photo',
       gps: 'GPS',
       group: 'Group',
-      dynamic_series: 'Dynamic Series'
+      dynamic_series: 'Dynamic Series',
+      date: 'Date'
     };
     return labels[type];
   };
@@ -1018,61 +1021,92 @@ export default function BuildingForm() {
       });
     });
 
-    // Build columns in form field order
+    // Build columns with section tracking
     const columns: any[] = [];
-    const columnPositions = new Map<string, number>();
-
-    // Add metadata columns first
+    const columnToSection = new Map<number, string>(); // Map column index to section title
+    
     columns.push({ header: 'SURVEYOR NAME', key: 'surveyorName', width: 20 });
     columns.push({ header: 'BUILDING ID', key: 'buildingId', width: 20 });
     columns.push({ header: 'DATE SUBMITTED', key: 'dateSubmitted', width: 15 });
     
     let colIdx = columns.length;
 
-    // Add fields by section order
+    // Add fields by section order, tracking section boundaries
     sections.forEach(section => {
-      const sectionStartIdx = colIdx;
-      
       section.fields.forEach(field => {
         if (!hiddenFields.includes(field.label) && field.label !== 'Building ID' && field.label !== 'Surveyor Name') {
           if (field.type === 'group' && field.subFields) {
             field.subFields.forEach(sub => {
               const key = `${field.label} [${sub.label}]`;
-              columns.push({ header: key.toUpperCase(), key, width: 18, sectionName: section.title });
-              columnPositions.set(key, colIdx);
+              columns.push({ header: key.toUpperCase(), key, width: 18 });
+              columnToSection.set(colIdx, section.title);
               colIdx++;
             });
           } else if (field.type === 'image') {
             const max = imageFields.get(field.label) || 0;
             for (let i = 1; i <= max; i++) {
               const key = `${field.label}_${i}`;
-              columns.push({ header: `${field.label.toUpperCase()} ${i}`, key, width: 30, sectionName: section.title });
-              columnPositions.set(key, colIdx);
+              columns.push({ header: `${field.label.toUpperCase()} ${i}`, key, width: 30 });
+              columnToSection.set(colIdx, section.title);
               colIdx++;
             }
           } else if (field.type === 'dynamic_series') {
             const labels = dynamicSeriesFields.get(field.label) || [];
             labels.forEach(label => {
               const key = `${field.label} [${label}]`;
-              columns.push({ header: key.toUpperCase(), key, width: 18, sectionName: section.title });
-              columnPositions.set(key, colIdx);
+              columns.push({ header: key.toUpperCase(), key, width: 18 });
+              columnToSection.set(colIdx, section.title);
               colIdx++;
             });
           } else {
-            columns.push({ header: field.label.toUpperCase(), key: field.label, width: 22, sectionName: section.title });
-            columnPositions.set(field.label, colIdx);
+            columns.push({ header: field.label.toUpperCase(), key: field.label, width: 22 });
+            columnToSection.set(colIdx, section.title);
             colIdx++;
           }
         }
       });
     });
 
-    // Add hidden timing fields at the end
+    // Add hidden timing fields
     columns.push({ header: 'START TIME', key: '__startTime', width: 20, hidden: true });
     columns.push({ header: 'END TIME', key: '__endTime', width: 20, hidden: true });
     columns.push({ header: 'DURATION (SECONDS)', key: '__duration', width: 20, hidden: true });
 
     worksheet.columns = columns;
+
+    // Add section header row (merged cells)
+    const sectionRow = worksheet.insertRow(1, []);
+    let currentSection = '';
+    let sectionStartCol = 1;
+    
+    for (let col = 1; col <= columns.length; col++) {
+      const section = columnToSection.get(col - 1) || '';
+      if (section !== currentSection) {
+        // Merge previous section if it exists
+        if (currentSection && sectionStartCol < col) {
+          sectionRow.getCell(sectionStartCol).value = currentSection;
+          sectionRow.getCell(sectionStartCol).font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+          sectionRow.getCell(sectionStartCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF085394' } };
+          sectionRow.getCell(sectionStartCol).alignment = { horizontal: 'center', vertical: 'middle' };
+          if (sectionStartCol < col - 1) {
+            worksheet.mergeCells(sectionRow.number, sectionStartCol, sectionRow.number, col - 1);
+          }
+        }
+        currentSection = section;
+        sectionStartCol = col;
+      }
+    }
+    // Handle last section
+    if (currentSection && sectionStartCol <= columns.length) {
+      sectionRow.getCell(sectionStartCol).value = currentSection;
+      sectionRow.getCell(sectionStartCol).font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+      sectionRow.getCell(sectionStartCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF085394' } };
+      sectionRow.getCell(sectionStartCol).alignment = { horizontal: 'center', vertical: 'middle' };
+      if (sectionStartCol < columns.length) {
+        worksheet.mergeCells(sectionRow.number, sectionStartCol, sectionRow.number, columns.length);
+      }
+    }
+    sectionRow.height = 25;
 
     // Add data rows
     dataToExport.forEach(r => {
@@ -1118,15 +1152,22 @@ export default function BuildingForm() {
       worksheet.addRow(row);
     });
 
-    // Format worksheet
+    // Format worksheet with centered alignment for data
     worksheet.eachRow((row, i) => {
       row.eachCell((cell, colNum) => {
         cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-        cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
         
         if (i === 1) {
+          // Section header row (already formatted above)
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        } else if (i === 2) {
+          // Column header row
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF001F3F' } };
           cell.font = { color: { argb: 'FF39CCCC' }, bold: true, size: 10 };
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        } else {
+          // Data rows - CENTER aligned
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         }
       });
       row.height = Math.max(30, Math.ceil(row.height || 15));
@@ -1473,18 +1514,18 @@ export default function BuildingForm() {
                   <p className="text-[10px] font-bold text-[#39CCCC] mb-3">⚡ Quick Add:</p>
                   <div className="grid grid-cols-3 gap-2">
                     <button onClick={() => quickAddField('text', 'New Text Field')} className="bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold py-2 px-3 rounded transition">📝 Text</button>
+                    <button onClick={() => quickAddField('date', 'New Date')} className="bg-cyan-500 hover:bg-cyan-600 text-white text-[10px] font-bold py-2 px-3 rounded transition">📅 Date</button>
                     <button onClick={() => quickAddField('select', 'New Dropdown')} className="bg-green-500 hover:bg-green-600 text-white text-[10px] font-bold py-2 px-3 rounded transition">📋 Dropdown</button>
                     <button onClick={() => quickAddField('image', 'New Photos')} className="bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-bold py-2 px-3 rounded transition">📷 Photos</button>
                     <button onClick={() => quickAddField('number', 'New Number')} className="bg-purple-500 hover:bg-purple-600 text-white text-[10px] font-bold py-2 px-3 rounded transition">🔢 Number</button>
                     <button onClick={() => quickAddField('gps', 'Location')} className="bg-pink-500 hover:bg-pink-600 text-white text-[10px] font-bold py-2 px-3 rounded transition">📍 GPS</button>
-                    <button onClick={() => quickAddField('checkbox', 'New Checkbox')} className="bg-yellow-500 hover:bg-yellow-600 text-white text-[10px] font-bold py-2 px-3 rounded transition">☑️ Check</button>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                     <input type="text" placeholder="Field Label" className="p-3 bg-white/10 rounded-xl text-xs font-bold border border-white/10 text-white" value={newFieldLabel} onChange={(e) => setNewFieldLabel(e.target.value)} />
                     <select className="p-3 bg-white rounded-xl text-xs font-bold text-black" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldType)}>
-                        <option value="text">Text</option><option value="number">Number</option><option value="select">Dropdown</option><option value="multi_select">Multi-Select</option>
+                        <option value="text">Text</option><option value="date">Date</option><option value="number">Number</option><option value="select">Dropdown</option><option value="multi_select">Multi-Select</option>
                         <option value="checkbox">Check</option><option value="image">Photo</option><option value="gps">GPS</option>
                         <option value="group">Group (Sub-fields)</option><option value="dynamic_series">Dynamic Series</option>
                     </select>
@@ -1687,6 +1728,14 @@ export default function BuildingForm() {
                                   onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} 
                                 />
                               )
+                            )}
+                            {f.type === 'date' && (
+                              <input 
+                                type="date" 
+                                className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" 
+                                value={formData[f.label] || ''} 
+                                onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} 
+                              />
                             )}
                             {f.type === 'number' && <input type="number" className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" placeholder="0" value={formData[f.label] || ''} onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} />}
                             
