@@ -1854,8 +1854,8 @@ export default function BuildingForm() {
           {showSurveyorModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border-4 border-[#001F3F]">
-                <h2 className="text-lg font-black text-[#001F3F] mb-2">👤 Who are you?</h2>
-                <p className="text-xs text-slate-600 mb-4">Enter your name (first time only)</p>
+                <h2 className="text-lg font-black text-[#001F3F] mb-2">👤 What's your name??</h2>
+                <p className="text-xs text-slate-600 mb-4">Enter your name</p>
                 <input 
                   type="text" 
                   placeholder="Your name" 
