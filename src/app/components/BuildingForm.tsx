@@ -330,6 +330,11 @@ export default function BuildingForm() {
   const [bulkSelectedFields, setBulkSelectedFields] = useState<Set<string>>(new Set());
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [editingFieldSectionIndex, setEditingFieldSectionIndex] = useState<number | null>(null);
+  
+  // NEW: Conditional Logic Features
+  const [showConditionalTestMode, setShowConditionalTestMode] = useState(false);
+  const [testPreviewData, setTestPreviewData] = useState<Record<string, any>>({});
+  const [circularDependencyWarnings, setCircularDependencyWarnings] = useState<string[]>([]);
 
 
   // ========== HELPER FUNCTIONS FOR UI ENHANCEMENTS ==========
@@ -499,6 +504,9 @@ export default function BuildingForm() {
       setInstallPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handlePrompt);
+    
+    // NEW: Detect circular dependencies on mount
+    detectCircularDependencies();
   
     return () => { 
       window.removeEventListener('online', update); 
@@ -570,6 +578,11 @@ export default function BuildingForm() {
     setDarkMode(savedDarkMode);
   }, []);
 
+  // NEW: Re-check circular dependencies when schema changes
+  useEffect(() => {
+    detectCircularDependencies();
+  }, [sections]);
+
   // NEW: Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -591,6 +604,85 @@ export default function BuildingForm() {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [formData]);
+
+  // NEW: Check if a field's dependency condition is satisfied
+  const isConditionSatisfied = (field: CustomField, dataSource: Record<string, any> = formData): boolean => {
+    if (!field.dependsOn) return true;
+    const parentField = sections.flatMap(s => s.fields).find(f => f.id === field.dependsOn?.fieldId);
+    if (!parentField) return true;
+    const parentValue = dataSource[parentField.label];
+    
+    switch (field.dependsOn.conditionType) {
+      case 'equals':
+        return field.dependsOn.triggerValues ? field.dependsOn.triggerValues.includes(String(parentValue)) : false;
+      case 'notCaptured':
+        return !parentValue || (Array.isArray(parentValue) && parentValue.length === 0);
+      case 'isEmpty':
+        return !parentValue || String(parentValue).trim() === '';
+      case 'countGreaterThan':
+        if (Array.isArray(parentValue)) return parentValue.length > (field.dependsOn.triggerCount || 0);
+        return false;
+      default:
+        return true;
+    }
+  };
+
+  // NEW: Get human-readable description of a field's condition
+  const getConditionDescription = (field: CustomField): string => {
+    if (!field.dependsOn) return '';
+    const parentField = sections.flatMap(s => s.fields).find(f => f.id === field.dependsOn?.fieldId);
+    if (!parentField) return '';
+    
+    switch (field.dependsOn.conditionType) {
+      case 'equals':
+        const values = field.dependsOn.triggerValues?.join(' or ') || 'unknown';
+        return `appears when "${parentField.label}" is "${values}"`;
+      case 'notCaptured':
+        return `appears when "${parentField.label}" is not answered`;
+      case 'isEmpty':
+        return `appears when "${parentField.label}" is empty`;
+      case 'countGreaterThan':
+        return `appears when "${parentField.label}" has more than ${field.dependsOn.triggerCount} item(s)`;
+      default:
+        return '';
+    }
+  };
+
+  // NEW: Detect circular dependencies
+  const detectCircularDependencies = () => {
+    const warnings: string[] = [];
+    const visited = new Set<string>();
+    const recursionStack = new Set<string>();
+
+    const hasCycle = (fieldId: string): boolean => {
+      visited.add(fieldId);
+      recursionStack.add(fieldId);
+
+      const field = sections.flatMap(s => s.fields).find(f => f.id === fieldId);
+      if (field?.dependsOn) {
+        const dependsOnId = field.dependsOn.fieldId;
+        if (!visited.has(dependsOnId)) {
+          if (hasCycle(dependsOnId)) return true;
+        } else if (recursionStack.has(dependsOnId)) {
+          return true;
+        }
+      }
+
+      recursionStack.delete(fieldId);
+      return false;
+    };
+
+    sections.forEach(sec => {
+      sec.fields.forEach(field => {
+        if (!visited.has(field.id) && hasCycle(field.id)) {
+          warnings.push(`⚠️ Circular dependency detected involving "${field.label}"`);
+        }
+      });
+    });
+
+    setCircularDependencyWarnings(warnings);
+    return warnings;
+  };
 
   // NEW: Calculate quality indicator
   const calculateQualityScore = (report: BuildingReport): { score: number; status: 'complete' | 'incomplete' | 'partial' } => {
@@ -628,20 +720,32 @@ export default function BuildingForm() {
     }]);
   };
 
-  // NEW: Check for missing required fields
-  const validateRequiredFields = (): string[] => {
+  // FIXED: Check for missing required fields - now respects conditional logic
+  const validateRequiredFields = (): { missing: string[]; conditionNotMet: string[] } => {
     const missing: string[] = [];
+    const conditionNotMet: string[] = [];
+    
     sections.forEach(sec => {
       sec.fields.forEach(f => {
         if (f.required) {
-          const val = formData[f.label];
-          if (!val || (Array.isArray(val) && val.length === 0) || val === '') {
-            missing.push(`${f.label} (${sec.title})`);
+          // Check if this field's condition is satisfied
+          const conditionMet = isConditionSatisfied(f);
+          
+          if (conditionMet) {
+            // Only validate as required if the condition is met and field is visible
+            const val = formData[f.label];
+            if (!val || (Array.isArray(val) && val.length === 0) || val === '') {
+              missing.push(`${f.label} (${sec.title})`);
+            }
+          } else if (f.dependsOn) {
+            // Track which required fields have unmet conditions
+            conditionNotMet.push(`${f.label} - ${getConditionDescription(f)}`);
           }
         }
       });
     });
-    return missing;
+    
+    return { missing, conditionNotMet };
   };
 
   // NEW: Filter reports logic
@@ -717,11 +821,15 @@ export default function BuildingForm() {
   const submitReport = async () => {
     if (!formData['Building ID']) return alert("Critical: Building ID Required.");
     
-    // NEW: Validate required fields
-    const missingFields = validateRequiredFields();
-    if (missingFields.length > 0) {
-      const fieldList = missingFields.join('\n• ');
-      return alert(`⚠️ Missing Required Fields:\n• ${fieldList}\n\nPlease fill these before submitting.`);
+    // FIXED: Validate required fields with conditional logic
+    const { missing, conditionNotMet } = validateRequiredFields();
+    if (missing.length > 0) {
+      const fieldList = missing.join('\n• ');
+      let message = `⚠️ Missing Required Fields:\n• ${fieldList}\n\nPlease fill these before submitting.`;
+      if (conditionNotMet.length > 0) {
+        message += `\n\n📌 Note: The following required fields did not appear because their conditions weren't met:\n• ${conditionNotMet.join('\n• ')}`;
+      }
+      return alert(message);
     }
 
     // Add end time and duration
@@ -740,6 +848,8 @@ export default function BuildingForm() {
       try {
           const { error } = await supabase.from('building_reports').insert([{ building_id: entry.building_id, full_data: entry.full_data }]);
           if (!error) { 
+            // ✅ Increment counter ONLY on successful submission
+            incrementSurveyCounter(surveyorName);
             alert("✅ Packet Uploaded!"); 
             localStorage.removeItem('formDataDraft'); 
             setFormData({}); 
@@ -758,6 +868,8 @@ export default function BuildingForm() {
     } else {
       await localDB.outbox.add(entry); 
       await checkPending(); 
+      // ✅ Increment counter on offline save too (will be synced later)
+      incrementSurveyCounter(surveyorName);
       alert("📦 Offline Mode: Saved to Vault."); 
       setFormData({}); 
       setSurveyStartTime(null);
@@ -777,13 +889,20 @@ export default function BuildingForm() {
     setTempSurveyorName('');
   };
 
-  const generateBuildingId = (name: string): string => {
-    // Get counter from localStorage for this surveyor
+  const getNextBuildingId = (name: string): string => {
+    // Get counter from localStorage for this surveyor (WITHOUT incrementing)
+    const counterKey = `survey_counter_${name}`;
+    const counter = parseInt(localStorage.getItem(counterKey) || '0', 10);
+    const nextNumber = counter + 1;
+    return `${name}-${String(nextNumber).padStart(3, '0')}`;
+  };
+
+  const incrementSurveyCounter = (name: string): void => {
+    // Increment counter ONLY after successful submission
     const counterKey = `survey_counter_${name}`;
     let counter = parseInt(localStorage.getItem(counterKey) || '0', 10);
     counter++;
     localStorage.setItem(counterKey, counter.toString());
-    return `${name}-${String(counter).padStart(3, '0')}`;
   };
 
   const startNewSurvey = () => {
@@ -792,12 +911,12 @@ export default function BuildingForm() {
       return;
     }
     
-    const newBuildingId = generateBuildingId(surveyorName);
+    const nextBuildingId = getNextBuildingId(surveyorName);
     const startTime = Date.now();
     
     setFormData({
       'Surveyor Name': surveyorName,
-      'Building ID': newBuildingId,
+      'Building ID': nextBuildingId,
       '__startTime': startTime,
     });
     setSurveyStartTime(startTime);
@@ -1613,7 +1732,95 @@ export default function BuildingForm() {
           {/* TAB 3: PREVIEW */}
           {adminTab === 'preview' && (
             <div className="bg-white p-6 rounded-3xl border-2 border-[#001F3F] shadow-xl space-y-4">
-              <h3 className="text-xs font-black uppercase text-[#001F3F]">👁️ Live Form Preview</h3>
+              {/* Circular Dependency Warnings */}
+              {circularDependencyWarnings.length > 0 && (
+                <div className="bg-red-50 border-2 border-red-300 p-4 rounded-xl">
+                  <p className="text-xs font-black text-red-800 mb-2">🚨 CIRCULAR DEPENDENCY WARNINGS:</p>
+                  {circularDependencyWarnings.map((warning, idx) => (
+                    <p key={idx} className="text-[9px] text-red-700 ml-4">{warning}</p>
+                  ))}
+                </div>
+              )}
+              
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xs font-black uppercase text-[#001F3F]">👁️ Live Form Preview</h3>
+                <button 
+                  onClick={() => setShowConditionalTestMode(!showConditionalTestMode)}
+                  className={`text-[10px] font-bold px-3 py-2 rounded-lg transition-all ${showConditionalTestMode ? 'bg-[#001F3F] text-[#39CCCC]' : 'bg-slate-200 text-slate-700'}`}
+                >
+                  🧪 Test Conditions
+                </button>
+              </div>
+              
+              {showConditionalTestMode && (
+                <div className="bg-blue-50 border-2 border-blue-300 p-4 rounded-xl space-y-3">
+                  <p className="text-xs font-black text-blue-800">Simulate Conditions - Set values to preview field visibility:</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                    {sections.flatMap(s => s.fields).filter(f => f.dependsOn || sections.flatMap(sec => sec.fields).some(field => field.dependsOn?.fieldId === f.id)).map(field => (
+                      <div key={field.id}>
+                        <p className="text-[9px] font-bold text-blue-900 mb-1">{field.label}</p>
+                        {field.type === 'select' && (
+                          <select 
+                            className="w-full p-2 text-xs rounded border border-blue-300 bg-white text-black"
+                            value={testPreviewData[field.label] || ''}
+                            onChange={(e) => setTestPreviewData({...testPreviewData, [field.label]: e.target.value})}
+                          >
+                            <option value="">Select...</option>
+                            {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        )}
+                        {field.type === 'multi_select' && (
+                          <div className="grid grid-cols-1 gap-1">
+                            {field.options?.map(opt => (
+                              <label key={opt} className="text-[9px] flex items-center gap-1 cursor-pointer">
+                                <input 
+                                  type="checkbox" 
+                                  checked={(testPreviewData[field.label] as string[] || []).includes(opt)}
+                                  onChange={(e) => {
+                                    const current = testPreviewData[field.label] as string[] || [];
+                                    if (e.target.checked) {
+                                      setTestPreviewData({...testPreviewData, [field.label]: [...current, opt]});
+                                    } else {
+                                      setTestPreviewData({...testPreviewData, [field.label]: current.filter(v => v !== opt)});
+                                    }
+                                  }}
+                                  className="accent-blue-600"
+                                />
+                                {opt}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                        {field.type === 'text' && (
+                          <input 
+                            type="text" 
+                            className="w-full p-2 text-xs rounded border border-blue-300 bg-white text-black"
+                            value={testPreviewData[field.label] || ''}
+                            onChange={(e) => setTestPreviewData({...testPreviewData, [field.label]: e.target.value})}
+                            placeholder="Enter test value"
+                          />
+                        )}
+                        {field.type === 'number' && (
+                          <input 
+                            type="number" 
+                            className="w-full p-2 text-xs rounded border border-blue-300 bg-white text-black"
+                            value={testPreviewData[field.label] || ''}
+                            onChange={(e) => setTestPreviewData({...testPreviewData, [field.label]: e.target.value})}
+                            placeholder="Enter test value"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <button 
+                    onClick={() => setTestPreviewData({})}
+                    className="w-full text-[10px] font-bold bg-blue-200 text-blue-800 p-2 rounded hover:bg-blue-300"
+                  >
+                    🔄 Clear Test Data
+                  </button>
+                </div>
+              )}
+              
               <p className="text-[10px] text-slate-600">Changes appear here instantly:</p>
               <div className="bg-[#F5F5F5] p-4 rounded-xl border-2 border-dashed border-slate-300 max-h-96 overflow-y-auto">
                 {sections.length === 0 ? (
@@ -1627,12 +1834,19 @@ export default function BuildingForm() {
                           {section.fields.length === 0 ? (
                             <p className="text-[9px] text-slate-500">No fields in this section</p>
                           ) : (
-                            section.fields.map((f) => (
-                              <div key={f.id} className="bg-white p-3 rounded-lg border border-slate-200 text-[9px]">
-                                <p className="font-bold"><span className="text-[#001F3F]">{f.label}</span> {f.required && <span className="text-red-500 ml-1">*</span>} <span className="text-[7px] bg-slate-100 px-1 rounded text-slate-600">{f.type}</span></p>
-                                {f.dependsOn && <p className="text-[8px] text-blue-600 mt-1">⚡ Shown when parent field triggers</p>}
-                              </div>
-                            ))
+                            section.fields.map((f) => {
+                              const conditionMet = isConditionSatisfied(f, showConditionalTestMode ? testPreviewData : formData);
+                              return (
+                                <div key={f.id} className={`p-3 rounded-lg border text-[9px] transition-all ${
+                                  conditionMet 
+                                    ? 'bg-white border-slate-200' 
+                                    : 'bg-slate-50 border-dashed border-slate-300 opacity-50'
+                                }`}>
+                                  <p className="font-bold"><span className="text-[#001F3F]">{f.label}</span> {f.required && <span className="text-red-500 ml-1">*</span>} <span className="text-[7px] bg-slate-100 px-1 rounded text-slate-600">{f.type}</span> {!conditionMet && <span className="text-[7px] bg-slate-200 px-1 rounded text-slate-500 ml-1">HIDDEN</span>}</p>
+                                  {f.dependsOn && <p className={`text-[8px] mt-1 ${conditionMet ? 'text-blue-600' : 'text-slate-500 line-through'}`}>⚡ {getConditionDescription(f)}</p>}
+                                </div>
+                              );
+                            })
                           )}
                         </div>
                       </div>
@@ -1692,10 +1906,14 @@ export default function BuildingForm() {
                         shouldShowField(f) && (
                         <div key={f.id} className="bg-white p-4 sm:p-6 rounded-2xl border-2 border-slate-100 shadow-sm relative hover:border-blue-200 transition-colors">
                             <div className="flex justify-between items-center mb-2">
-                                <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111] flex items-center gap-1">
-                                    {f.label} <Tooltip text={f.tooltip} />
-                                    {f.required && <span className="text-red-500">*</span>}
-                                </label>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111] flex items-center gap-1">
+                                      {f.label}
+                                      {f.dependsOn && <span title={`Conditional: ${getConditionDescription(f)}`} className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">⚡ Conditional</span>}
+                                      <Tooltip text={f.dependsOn ? `${f.tooltip}\n\n⚡ ${getConditionDescription(f)}` : f.tooltip} />
+                                      {f.required && <span className="text-red-500">*</span>}
+                                  </label>
+                                </div>
                                 {isAdmin && (
                                     <div className="flex gap-2">
                                         <button onClick={() => openFieldEditModal(f.id, section.id, f.type, f.options)} title="Edit Field" className="text-slate-300 hover:text-yellow-500"><PenTool size={14}/></button>
