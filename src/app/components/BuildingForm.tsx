@@ -220,7 +220,7 @@ const MultiSelect = ({ options, value, onChange }: { options: string[], value: s
 const DynamicSeries = ({ value, onChange, darkModeProp = false }: { value: DynamicSeriesItem[], onChange: (val: DynamicSeriesItem[]) => void, darkModeProp?: boolean }) => {
     const addRow = () => {
         const nextIdx = value.length + 1;
-        onChange([...value, { label: `Story ${nextIdx}`, value: '' }]);
+        onChange([...value, { label: `Label ${nextIdx}`, value: '' }]);
     };
     
     const updateRow = (index: number, field: 'label' | 'value', val: string) => {
@@ -235,7 +235,7 @@ const DynamicSeries = ({ value, onChange, darkModeProp = false }: { value: Dynam
         {value.map((item, idx) => (
           <div key={idx} className="flex gap-2">
             <input type="text" className={`w-1/2 p-2 rounded border font-bold text-xs ${dm ? 'bg-slate-700 text-white border-slate-600 placeholder:text-slate-300' : 'bg-[#F5F5F5] text-black border-[#CCCCCC] placeholder:text-slate-500'}`} 
-              value={item.label} onChange={(e) => updateRow(idx, 'label', e.target.value)} placeholder="Label (e.g. Story 1)" />
+              value={item.label} onChange={(e) => updateRow(idx, 'label', e.target.value)} placeholder="Label" />
             <input type="number" className={`w-1/2 p-2 rounded border font-bold text-xs ${dm ? 'bg-slate-800 text-white border-slate-600 placeholder:text-slate-300' : 'bg-white text-black border-[#AAAAAA] placeholder:text-slate-500'}`} 
               value={item.value} onChange={(e) => updateRow(idx, 'value', e.target.value)} placeholder="Value" />
             <button onClick={() => onChange(value.filter((_, i) => i !== idx))} className="text-red-500"><Trash2 size={16}/></button>
@@ -523,16 +523,26 @@ export default function BuildingForm() {
     if (outcome === 'accepted') setInstallPrompt(null);
   };
 
-  // NEW: Autosave Effect (every 30 seconds)
+  // NEW: Real-time Autosave Effect (save immediately on any change)
   useEffect(() => {
     if (Object.keys(formData).length === 0) return;
-    const timer = setInterval(() => {
-      localStorage.setItem('formDataDraft', JSON.stringify(formData));
-      setLastSaved(new Date());
-      setUnsavedChanges(false);
-    }, 30000);
-    return () => clearInterval(timer);
+    // Save draft immediately on any change
+    localStorage.setItem('formDataDraft', JSON.stringify(formData));
+    setLastSaved(new Date());
   }, [formData]);
+
+  // NEW: Page unload handler to save draft before leaving
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (Object.keys(formData).length > 0 && unsavedChanges) {
+        localStorage.setItem('formDataDraft', JSON.stringify(formData));
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [formData, unsavedChanges]);
 
   // NEW: Load autosaved draft on mount
   useEffect(() => {
@@ -560,6 +570,25 @@ export default function BuildingForm() {
       setUnsavedChanges(true);
     }
   }, [formData]);
+
+  // NEW: Auto-populate Building ID and Surveyor Name when surveyor name is set
+  useEffect(() => {
+    if (!surveyorName) return;
+    
+    // Only auto-populate if form is empty (new survey) or doesn't have Building ID yet
+    if (!formData['Building ID']) {
+      const nextBuildingId = getNextBuildingId(surveyorName);
+      const startTime = Date.now();
+      
+      setFormData(prev => ({
+        ...prev,
+        'Surveyor Name': surveyorName,
+        'Building ID': nextBuildingId,
+        '__startTime': startTime,
+      }));
+      setSurveyStartTime(startTime);
+    }
+  }, [surveyorName]);
 
   // NEW: Dark mode effect
   useEffect(() => {
