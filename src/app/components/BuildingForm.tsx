@@ -1302,10 +1302,15 @@ export default function BuildingForm() {
       if (fieldRow.section !== currentSection && fieldRow.section !== 'METADATA') {
         const sectionSeparator = worksheet.addRow({});
         sectionSeparator.getCell(1).value = `[${fieldRow.section}]`;
-        sectionSeparator.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF085394' } };
-        sectionSeparator.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-        sectionSeparator.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
-        sectionSeparator.height = 22;
+        // Use a distinct color for section headers (forest green)
+        sectionSeparator.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF27AE60' } };
+        sectionSeparator.getCell(1).font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+        sectionSeparator.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        
+        // Merge cells across all report columns
+        worksheet.mergeCells(sectionSeparator.number, 1, sectionSeparator.number, columns.length);
+        
+        sectionSeparator.height = 25;
         currentSection = fieldRow.section;
       }
 
