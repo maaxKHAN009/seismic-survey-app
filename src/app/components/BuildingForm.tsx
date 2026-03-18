@@ -1297,9 +1297,11 @@ export default function BuildingForm() {
 
     // Add field rows
     let currentSection = '';
+    let sectionCounter = 0;
     fieldRows.forEach(fieldRow => {
       // Add section header row if section changes
       if (fieldRow.section !== currentSection && fieldRow.section !== 'METADATA') {
+        sectionCounter++;
         const sectionSeparator = worksheet.addRow({});
         const rowNum = sectionSeparator.number;
         
@@ -1307,7 +1309,7 @@ export default function BuildingForm() {
         worksheet.mergeCells(rowNum, 1, rowNum, columns.length);
         
         const mergedCell = sectionSeparator.getCell(1);
-        mergedCell.value = `[${fieldRow.section}]`;
+        mergedCell.value = `${sectionCounter}. [${fieldRow.section}]`;
         // Use a distinct color for section headers (forest green)
         mergedCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF27AE60' } };
         mergedCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
@@ -1336,8 +1338,8 @@ export default function BuildingForm() {
           if (colNum === 1) {
             cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
           }
-        } else if (cell.value?.toString().includes('[')) {
-          // Section separator rows - format as headers with green color and center alignment
+        } else if (cell.value?.toString().match(/^\d/)) {
+          // Section separator rows - format as headers with green color and center alignment (only if first character is a digit)
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF27AE60' } };
           cell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
           cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
