@@ -1337,10 +1337,10 @@ export default function BuildingForm() {
             cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
           }
         } else if (cell.value?.toString().includes('[')) {
-          // Section separator rows - format as headers
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF085394' } };
-          cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
-          cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+          // Section separator rows - format as headers with green color and center alignment
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF27AE60' } };
+          cell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         } else if (colNum === 1) {
           // Field name column - left aligned
           cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
