@@ -1338,8 +1338,8 @@ export default function BuildingForm() {
           if (colNum === 1) {
             cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
           }
-        } else if (cell.value?.toString().match(/^\d/)) {
-          // Section separator rows - format as headers with green color and center alignment (only if first character is a digit)
+        } else if (cell.value?.toString().match(/^\d+\. \[.*\]$/)) {
+          // Section separator rows - format as headers with green color and center alignment (only if it matches "1. [SECTION]" pattern)
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF27AE60' } };
           cell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
           cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
