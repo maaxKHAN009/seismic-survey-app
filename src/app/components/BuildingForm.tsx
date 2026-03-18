@@ -1147,7 +1147,7 @@ export default function BuildingForm() {
   };
 
   const exportToExcel = async (subset?: BuildingReport[]) => {
-    const dataToExport = subset || reports;
+    const dataToExport = (subset || reports).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     if (dataToExport.length === 0) return alert("No data.");
 
     const workbook = new ExcelJS.Workbook();
@@ -1169,161 +1169,183 @@ export default function BuildingForm() {
       });
     });
 
-    // Build columns with section tracking
-    const columns: any[] = [];
-    const columnToSection = new Map<number, string>(); // Map column index to section title
-    
-    columns.push({ header: 'SURVEYOR NAME', key: 'surveyorName', width: 20 });
-    columns.push({ header: 'BUILDING ID', key: 'buildingId', width: 20 });
-    columns.push({ header: 'DATE SUBMITTED', key: 'dateSubmitted', width: 15 });
-    
-    let colIdx = columns.length;
+    // Build field structure (rows in transposed view)
+    interface FieldRow {
+      label: string;
+      section: string;
+      getData: (report: BuildingReport) => any;
+    }
+    const fieldRows: FieldRow[] = [];
 
-    // Add fields by section order, tracking section boundaries
+    // Add metadata rows
+    fieldRows.push({
+      label: 'SURVEYOR NAME',
+      section: 'METADATA',
+      getData: (r) => r.full_data['Surveyor Name'] || ''
+    });
+    fieldRows.push({
+      label: 'BUILDING ID',
+      section: 'METADATA',
+      getData: (r) => r.building_id
+    });
+    fieldRows.push({
+      label: 'DATE SUBMITTED',
+      section: 'METADATA',
+      getData: (r) => new Date(r.created_at).toLocaleDateString()
+    });
+
+    // Add fields by section
     sections.forEach(section => {
       section.fields.forEach(field => {
         if (!hiddenFields.includes(field.label) && field.label !== 'Building ID' && field.label !== 'Surveyor Name') {
           if (field.type === 'group' && field.subFields) {
             field.subFields.forEach(sub => {
               const key = `${field.label} [${sub.label}]`;
-              columns.push({ header: key.toUpperCase(), key, width: 18 });
-              columnToSection.set(colIdx, section.title);
-              colIdx++;
+              fieldRows.push({
+                label: key.toUpperCase(),
+                section: section.title,
+                getData: (r) => r.full_data[key] || ''
+              });
             });
           } else if (field.type === 'image') {
             const max = imageFields.get(field.label) || 0;
             for (let i = 1; i <= max; i++) {
-              const key = `${field.label}_${i}`;
-              columns.push({ header: `${field.label.toUpperCase()} ${i}`, key, width: 30 });
-              columnToSection.set(colIdx, section.title);
-              colIdx++;
+              const baseLabel = `${field.label.toUpperCase()} ${i}`;
+              fieldRows.push({
+                label: baseLabel,
+                section: section.title,
+                getData: (r) => {
+                  const photos = Array.isArray(r.full_data[field.label]) ? r.full_data[field.label] : [];
+                  const p = photos[i - 1];
+                  return p ? { text: p.label || `Photo ${i}`, hyperlink: p.url, tooltip: 'Click to view' } : '';
+                }
+              });
             }
           } else if (field.type === 'dynamic_series') {
             const labels = dynamicSeriesFields.get(field.label) || [];
             labels.forEach(label => {
               const key = `${field.label} [${label}]`;
-              columns.push({ header: key.toUpperCase(), key, width: 18 });
-              columnToSection.set(colIdx, section.title);
-              colIdx++;
+              fieldRows.push({
+                label: key.toUpperCase(),
+                section: section.title,
+                getData: (r) => {
+                  const items = Array.isArray(r.full_data[field.label]) ? r.full_data[field.label] : [];
+                  const item = items.find((i: DynamicSeriesItem) => i.label === label);
+                  return item ? item.value : '';
+                }
+              });
             });
           } else {
-            columns.push({ header: field.label.toUpperCase(), key: field.label, width: 22 });
-            columnToSection.set(colIdx, section.title);
-            colIdx++;
+            fieldRows.push({
+              label: field.label.toUpperCase(),
+              section: section.title,
+              getData: (r) => {
+                const val = r.full_data[field.label];
+                return Array.isArray(val) ? val.join(', ') : val ?? '';
+              }
+            });
           }
         }
       });
     });
 
     // Add hidden timing fields
-    columns.push({ header: 'START TIME', key: '__startTime', width: 20, hidden: true });
-    columns.push({ header: 'END TIME', key: '__endTime', width: 20, hidden: true });
-    columns.push({ header: 'DURATION (SECONDS)', key: '__duration', width: 20, hidden: true });
-
-    worksheet.columns = columns;
-
-    // Add section header row (merged cells)
-    const sectionRow = worksheet.insertRow(1, []);
-    let currentSection = '';
-    let sectionStartCol = 1;
-    
-    for (let col = 1; col <= columns.length; col++) {
-      const section = columnToSection.get(col - 1) || '';
-      if (section !== currentSection) {
-        // Merge previous section if it exists
-        if (currentSection && sectionStartCol < col) {
-          sectionRow.getCell(sectionStartCol).value = currentSection;
-          sectionRow.getCell(sectionStartCol).font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-          sectionRow.getCell(sectionStartCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF085394' } };
-          sectionRow.getCell(sectionStartCol).alignment = { horizontal: 'center', vertical: 'middle' };
-          if (sectionStartCol < col - 1) {
-            worksheet.mergeCells(sectionRow.number, sectionStartCol, sectionRow.number, col - 1);
-          }
-        }
-        currentSection = section;
-        sectionStartCol = col;
-      }
-    }
-    // Handle last section
-    if (currentSection && sectionStartCol <= columns.length) {
-      sectionRow.getCell(sectionStartCol).value = currentSection;
-      sectionRow.getCell(sectionStartCol).font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-      sectionRow.getCell(sectionStartCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF085394' } };
-      sectionRow.getCell(sectionStartCol).alignment = { horizontal: 'center', vertical: 'middle' };
-      if (sectionStartCol < columns.length) {
-        worksheet.mergeCells(sectionRow.number, sectionStartCol, sectionRow.number, columns.length);
-      }
-    }
-    sectionRow.height = 25;
-
-    // Add data rows
-    dataToExport.forEach(r => {
-      const row: any = {
-        surveyorName: r.full_data['Surveyor Name'] || '',
-        buildingId: r.building_id,
-        dateSubmitted: new Date(r.created_at).toLocaleDateString(),
-      };
-      
-      // Add field values
-      sections.forEach(section => {
-        section.fields.forEach(field => {
-          if (!hiddenFields.includes(field.label) && field.label !== 'Building ID' && field.label !== 'Surveyor Name') {
-            const val = r.full_data[field.label];
-            
-            if (field.type === 'group' && field.subFields) {
-              field.subFields.forEach(sub => {
-                const key = `${field.label} [${sub.label}]`;
-                row[key] = r.full_data[key] || '';
-              });
-            } else if (field.type === 'image') {
-              const photos = Array.isArray(val) ? val : [];
-              photos.forEach((p, idx) => {
-                row[`${field.label}_${idx+1}`] = { text: p.label || `Photo ${idx+1}`, hyperlink: p.url, tooltip: 'Click to view' };
-              });
-            } else if (field.type === 'dynamic_series') {
-              const items = Array.isArray(val) ? val : [];
-              items.forEach((item: DynamicSeriesItem) => {
-                row[`${field.label} [${item.label}]`] = item.value;
-              });
-            } else {
-              row[field.label] = Array.isArray(val) ? val.join(', ') : val ?? '';
-            }
-          }
-        });
-      });
-
-      // Add hidden timing fields
-      row.__startTime = r.full_data['__startTime'] ? new Date(r.full_data['__startTime']).toLocaleString() : '';
-      row.__endTime = r.full_data['__endTime'] ? new Date(r.full_data['__endTime']).toLocaleString() : '';
-      row.__duration = r.full_data['__duration'] ? `${Math.floor(r.full_data['__duration'] / 60)}m ${r.full_data['__duration'] % 60}s` : '';
-
-      worksheet.addRow(row);
+    fieldRows.push({
+      label: 'START TIME',
+      section: 'TIMING',
+      getData: (r) => r.full_data['__startTime'] ? new Date(r.full_data['__startTime']).toLocaleString() : ''
+    });
+    fieldRows.push({
+      label: 'END TIME',
+      section: 'TIMING',
+      getData: (r) => r.full_data['__endTime'] ? new Date(r.full_data['__endTime']).toLocaleString() : ''
+    });
+    fieldRows.push({
+      label: 'DURATION (SECONDS)',
+      section: 'TIMING',
+      getData: (r) => r.full_data['__duration'] ? `${Math.floor(r.full_data['__duration'] / 60)}m ${r.full_data['__duration'] % 60}s` : ''
     });
 
-    // Format worksheet with centered alignment for data
+    // Build columns (reports + label column)
+    const columns: any[] = [{ header: 'FIELD NAME', key: 'fieldName', width: 25 }];
+    dataToExport.forEach((r, idx) => {
+      const reportLabel = `${r.full_data['Surveyor Name'] || 'Unknown'}-${r.building_id}`;
+      columns.push({
+        header: reportLabel,
+        key: `report_${idx}`,
+        width: 20
+      });
+    });
+    worksheet.columns = columns;
+
+    // Add section header row (merged cells for sections)
+    const sectionHeaderRow = worksheet.insertRow(1, []);
+    sectionHeaderRow.getCell(1).value = 'FIELD NAME';
+    sectionHeaderRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF085394' } };
+    sectionHeaderRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+    sectionHeaderRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // For report columns, we could add generic header or report date
+    for (let i = 2; i <= columns.length; i++) {
+      const report = dataToExport[i - 2];
+      sectionHeaderRow.getCell(i).value = new Date(report.created_at).toLocaleDateString();
+      sectionHeaderRow.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF001F3F' } };
+      sectionHeaderRow.getCell(i).font = { bold: true, size: 10, color: { argb: 'FF39CCCC' } };
+      sectionHeaderRow.getCell(i).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    }
+    sectionHeaderRow.height = 25;
+
+    // Add field rows
+    let currentSection = '';
+    fieldRows.forEach(fieldRow => {
+      // Add section header row if section changes
+      if (fieldRow.section !== currentSection && fieldRow.section !== 'METADATA') {
+        const sectionSeparator = worksheet.addRow({});
+        sectionSeparator.getCell(1).value = `[${fieldRow.section}]`;
+        sectionSeparator.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF085394' } };
+        sectionSeparator.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+        sectionSeparator.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+        sectionSeparator.height = 22;
+        currentSection = fieldRow.section;
+      }
+
+      const row: any = { fieldName: fieldRow.label };
+      dataToExport.forEach((r, idx) => {
+        row[`report_${idx}`] = fieldRow.getData(r);
+      });
+      const addedRow = worksheet.addRow(row);
+      addedRow.height = 20;
+    });
+
+    // Format all rows with borders and centered alignment
     worksheet.eachRow((row, i) => {
       row.eachCell((cell, colNum) => {
         cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-        
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
         if (i === 1) {
-          // Section header row (already formatted above)
-          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        } else if (i === 2) {
-          // Column header row
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF001F3F' } };
-          cell.font = { color: { argb: 'FF39CCCC' }, bold: true, size: 10 };
-          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          // Header row already formatted
+          if (colNum === 1) {
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          }
+        } else if (cell.value?.toString().includes('[')) {
+          // Section separator rows - format as headers
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF085394' } };
+          cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+          cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+        } else if (colNum === 1) {
+          // Field name column - left aligned
+          cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
         } else {
-          // Data rows - CENTER aligned
+          // Data cells - centered
           cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         }
       });
-      row.height = Math.max(30, Math.ceil(row.height || 15));
     });
 
-    // Auto-fit columns
+    // Auto-fit columns to content
     worksheet.columns.forEach(col => {
-      let maxLength = col.header?.length || 10;
+      let maxLength = (col.header?.toString() || '').length || 10;
       worksheet.eachRow(row => {
         const cell = row.getCell(col.key!);
         const cellValue = cell.value?.toString() || '';
