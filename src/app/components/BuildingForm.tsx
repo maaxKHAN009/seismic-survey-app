@@ -1293,7 +1293,7 @@ export default function BuildingForm() {
       sectionHeaderRow.getCell(i).font = { bold: true, size: 10, color: { argb: 'FF39CCCC' } };
       sectionHeaderRow.getCell(i).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     }
-    sectionHeaderRow.height = 25;
+    sectionHeaderRow.height = 30;
 
     // Add field rows
     let currentSection = '';
@@ -1315,7 +1315,7 @@ export default function BuildingForm() {
         mergedCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
         mergedCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         
-        sectionSeparator.height = 25;
+        sectionSeparator.height = 30;
         currentSection = fieldRow.section;
       }
 
@@ -1323,8 +1323,7 @@ export default function BuildingForm() {
       dataToExport.forEach((r, idx) => {
         row[`report_${idx}`] = fieldRow.getData(r);
       });
-      const addedRow = worksheet.addRow(row);
-      addedRow.height = 20;
+      worksheet.addRow(row);
     });
 
     // Format all rows with borders and centered alignment
@@ -1362,6 +1361,30 @@ export default function BuildingForm() {
         maxLength = Math.max(maxLength, cellValue.length);
       });
       col.width = Math.min(Math.max(maxLength + 2, 15), 50);
+    });
+
+    // Auto-adjust row heights based on content
+    worksheet.eachRow((row, rowNum) => {
+      let maxHeight = 20;
+      row.eachCell((cell, colNum) => {
+        if (cell.value) {
+          const cellText = cell.value.toString();
+          const colWidth = worksheet.columns[colNum - 1]?.width || 20;
+          // Estimate number of lines based on text length and column width
+          const estimatedLines = Math.ceil(cellText.length / (colWidth * 0.7));
+          // Calculate height: 15px per line (approximate)
+          const estimatedHeight = estimatedLines * 15 + 10;
+          maxHeight = Math.max(maxHeight, estimatedHeight);
+        }
+      });
+      // Set minimum heights for specific row types
+      if (rowNum === 1) {
+        row.height = Math.max(maxHeight, 30); // Header row
+      } else if (row.getCell(1).value?.toString().match(/^\d+\. \[.*\]$/)) {
+        row.height = Math.max(maxHeight, 30); // Section headers
+      } else {
+        row.height = Math.max(maxHeight, 22); // Data rows with minimum height
+      }
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
