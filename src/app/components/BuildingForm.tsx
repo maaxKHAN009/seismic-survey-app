@@ -1301,14 +1301,17 @@ export default function BuildingForm() {
       // Add section header row if section changes
       if (fieldRow.section !== currentSection && fieldRow.section !== 'METADATA') {
         const sectionSeparator = worksheet.addRow({});
-        sectionSeparator.getCell(1).value = `[${fieldRow.section}]`;
-        // Use a distinct color for section headers (forest green)
-        sectionSeparator.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF27AE60' } };
-        sectionSeparator.getCell(1).font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-        sectionSeparator.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        const rowNum = sectionSeparator.number;
         
-        // Merge cells across all report columns
-        worksheet.mergeCells(sectionSeparator.number, 1, sectionSeparator.number, columns.length);
+        // Merge cells across all report columns FIRST
+        worksheet.mergeCells(rowNum, 1, rowNum, columns.length);
+        
+        const mergedCell = sectionSeparator.getCell(1);
+        mergedCell.value = `[${fieldRow.section}]`;
+        // Use a distinct color for section headers (forest green)
+        mergedCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF27AE60' } };
+        mergedCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+        mergedCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         
         sectionSeparator.height = 25;
         currentSection = fieldRow.section;
