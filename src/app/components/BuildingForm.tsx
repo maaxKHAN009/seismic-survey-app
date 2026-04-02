@@ -713,7 +713,7 @@ export default function BuildingForm() {
     return warnings;
   };
 
-  // NEW: Calculate quality indicator
+  // NEW: Calculate quality indicator (respects conditional logic)
   const calculateQualityScore = (report: BuildingReport): { score: number; status: 'complete' | 'incomplete' | 'partial' } => {
     const data = report.full_data;
     let filled = 0;
@@ -721,12 +721,16 @@ export default function BuildingForm() {
     
     sections.forEach(sec => {
       sec.fields.forEach(f => {
-        total++;
-        const val = data[f.label];
-        if (val !== undefined && val !== null && val !== '') {
-          if (Array.isArray(val) && val.length > 0) filled++;
-          else if (!Array.isArray(val)) filled++;
+        // Only count fields that are visible (condition satisfied)
+        if (isConditionSatisfied(f, data)) {
+          total++;
+          const val = data[f.label];
+          if (val !== undefined && val !== null && val !== '') {
+            if (Array.isArray(val) && val.length > 0) filled++;
+            else if (!Array.isArray(val)) filled++;
+          }
         }
+        // Skip fields with unmet conditions - don't count them at all
       });
     });
     
