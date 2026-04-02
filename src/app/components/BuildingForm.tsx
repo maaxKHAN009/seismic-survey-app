@@ -713,7 +713,7 @@ export default function BuildingForm() {
     return warnings;
   };
 
-  // NEW: Calculate quality indicator (respects conditional logic)
+  // NEW: Calculate quality indicator (respects conditional logic and only counts required fields)
   const calculateQualityScore = (report: BuildingReport): { score: number; status: 'complete' | 'incomplete' | 'partial' } => {
     const data = report.full_data;
     let filled = 0;
@@ -721,8 +721,8 @@ export default function BuildingForm() {
     
     sections.forEach(sec => {
       sec.fields.forEach(f => {
-        // Only count fields that are visible (condition satisfied)
-        if (isConditionSatisfied(f, data)) {
+        // Only count fields that are REQUIRED and VISIBLE (condition satisfied)
+        if (f.required && isConditionSatisfied(f, data)) {
           total++;
           const val = data[f.label];
           if (val !== undefined && val !== null && val !== '') {
@@ -730,7 +730,7 @@ export default function BuildingForm() {
             else if (!Array.isArray(val)) filled++;
           }
         }
-        // Skip fields with unmet conditions - don't count them at all
+        // Skip optional fields and fields with unmet conditions - don't count them at all
       });
     });
     
