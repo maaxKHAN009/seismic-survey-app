@@ -84,6 +84,283 @@ interface BuildingReport {
 
 const DEFAULT_SECTIONS: Section[] = PROFORMA_SECTIONS as Section[];
 
+type TypologyFieldType = 'text' | 'number' | 'select';
+
+interface TypologyField {
+  id: string;
+  label: string;
+  type: TypologyFieldType;
+  options?: string[];
+  displayWhen?: {
+    fieldId: string;
+    equals: string;
+  };
+}
+
+interface TypologyDefinition {
+  label: string;
+  sheetName: string;
+  fields: TypologyField[];
+}
+
+interface TypologySpecificData {
+  selected_type: string;
+  responses: Record<string, any>;
+}
+
+const FLOOR_OPTIONS = ['RC Slab', 'timber flat roof', 'T-iron roof', 'Not applicable', 'other'];
+const ROOF_OPTIONS = ['RC Slab', 'timber flat roof', 'T-iron roof', 'wooden truss', 'steel truss', 'other'];
+const FLOOR_CONNECTION_OPTIONS = ['No connection/bearing', 'connection through wooden laces', 'other'];
+const ROOF_CONNECTION_OPTIONS = ['No connection/bearing', 'connection through wooden laces', 'steel anchor bolts', 'other'];
+
+const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
+  {
+    label: 'Unreinforced Stone Masonry',
+    sheetName: 'UR Stone Masonry',
+    fields: [
+      { id: 'no_of_storey', label: 'No. of storey', type: 'select', options: ['single storey', 'double storey'] },
+      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number' },
+      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number' },
+      { id: 'type_of_stone', label: 'Type of stone', type: 'select', options: ['Semi-dressed stone', 'round river-bed stone', 'foliated slate stone'] },
+      { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
+      { id: 'construction_material_distance', label: 'Construction material distance', type: 'text' },
+      { id: 'maximum_stone_size', label: 'Maximum stone size', type: 'select', options: ['>12"', '9"-12"', '6"-9"', '<6"', 'other size'] },
+      { id: 'maximum_stone_size_other', label: 'Maximum stone size (other)', type: 'number', displayWhen: { fieldId: 'maximum_stone_size', equals: 'other size' } },
+      { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Dry/No mortar', 'Mud mortar', 'Cement-sand mortar'] },
+      { id: 'through_stone_provision', label: 'Through stone', type: 'select', options: ['Provided', 'Not provided'] },
+      { id: 'through_stone_spacing', label: 'Through stone typical spacing', type: 'text' },
+      { id: 'orthogonal_wall_connection', label: 'Connection between orthogonal walls', type: 'select', options: ['through stone provided', 'not adequate connection'] },
+      { id: 'external_wall_thickness_category', label: 'External Wall Thickness', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
+      { id: 'external_wall_thickness_specific', label: 'External Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'external_wall_thickness_category', equals: 'specific thickness' } },
+      { id: 'internal_wall_thickness_category', label: 'Internal Wall Thickness', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
+      { id: 'internal_wall_thickness_specific', label: 'Internal Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'internal_wall_thickness_category', equals: 'specific thickness' } },
+      { id: 'window_size_length', label: 'Typical size of window - Length', type: 'number' },
+      { id: 'window_size_height', label: 'Typical size of window - Height', type: 'number' },
+      { id: 'door_size_length', label: 'Typical size of door - Length', type: 'number' },
+      { id: 'door_size_height', label: 'Typical size of door - Height', type: 'number' },
+      { id: 'lintel_beam_type', label: 'Type of lintel beam', type: 'select', options: ['Continuous on all opening', 'separate on each opening'] },
+      { id: 'opening_alignment_vertical', label: 'Opening alignment in vertical direction', type: 'select', options: ['Aligned', 'Not aligned'] },
+      { id: 'lintel_beam_material', label: 'Material of lintel beam', type: 'select', options: ['wooden beam', 'stone beam', 'RC beam', 'other'] },
+      { id: 'lintel_beam_material_other', label: 'Material of lintel beam - other', type: 'text', displayWhen: { fieldId: 'lintel_beam_material', equals: 'other' } },
+      { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'Stone masonry column'] },
+      { id: 'verandah_column_width', label: 'Verandah column size - width', type: 'number' },
+      { id: 'verandah_column_depth', label: 'Verandah column size - depth', type: 'number' },
+      { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
+      { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
+      { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
+      { id: 'floor_wall_connection_other', label: 'Connection of floor to wall - other', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
+      { id: 'roof_type', label: 'Type of roof', type: 'select', options: ROOF_OPTIONS },
+      { id: 'roof_type_other', label: 'Type of roof - other', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
+      { id: 'roof_wall_connection', label: 'Connection of roof to wall', type: 'select', options: ROOF_CONNECTION_OPTIONS },
+      { id: 'roof_wall_connection_other', label: 'Connection of roof to wall - other', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
+    ]
+  },
+  {
+    label: 'Stone Masonry with Timber Laces',
+    sheetName: 'Stone Masonry Timber',
+    fields: [
+      { id: 'no_of_storey', label: 'No. of storey', type: 'select', options: ['single storey', 'double storey'] },
+      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number' },
+      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number' },
+      { id: 'type_of_stone', label: 'Type of stone', type: 'select', options: ['Semi-dressed stone', 'round river-bed stone', 'foliated slate stone'] },
+      { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
+      { id: 'construction_material_distance', label: 'Construction material distance', type: 'number' },
+      { id: 'maximum_stone_size', label: 'Maximum stone size', type: 'select', options: ['>12"', '9"-12"', '6"-9"', '<6"', 'other size'] },
+      { id: 'maximum_stone_size_other', label: 'Maximum stone size (other)', type: 'number', displayWhen: { fieldId: 'maximum_stone_size', equals: 'other size' } },
+      { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Dry/No mortar', 'Mud mortar', 'Cement-sand mortar'] },
+      { id: 'external_wall_thickness_category', label: 'External Wall Thickness', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
+      { id: 'external_wall_thickness_specific', label: 'External Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'external_wall_thickness_category', equals: 'specific thickness' } },
+      { id: 'internal_wall_thickness_category', label: 'Internal Wall Thickness', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
+      { id: 'internal_wall_thickness_specific', label: 'Internal Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'internal_wall_thickness_category', equals: 'specific thickness' } },
+      { id: 'spacing_between_timber_laces', label: 'Spacing between timber laces', type: 'number' },
+      { id: 'size_of_timber_laces', label: 'Size of timber laces', type: 'number' },
+      { id: 'longitudinal_cross_connection', label: 'Connection between longitudinal timber laces and cross members', type: 'select', options: ['nailed', 'half connection'] },
+      { id: 'spacing_of_cross_members', label: 'Spacing of cross members', type: 'number' },
+      { id: 'corner_timber_connection', label: 'Connection between timber laces at wall corner', type: 'select', options: ['No connection', 'Nailed', 'Half connection with projection', 'half connection without projection'] },
+      { id: 'window_size_length', label: 'Typical size of window - Length', type: 'number' },
+      { id: 'window_size_height', label: 'Typical size of window - Height', type: 'number' },
+      { id: 'door_size_length', label: 'Typical size of door - Length', type: 'number' },
+      { id: 'door_size_height', label: 'Typical size of door - Height', type: 'number' },
+      { id: 'opening_alignment_vertical', label: 'Opening alignment in vertical direction', type: 'select', options: ['Aligned', 'Not aligned'] },
+      { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'Stone masonry column'] },
+      { id: 'verandah_column_width', label: 'Verandah column size - width', type: 'number' },
+      { id: 'verandah_column_depth', label: 'Verandah column size - depth', type: 'number' },
+      { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
+      { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
+      { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
+      { id: 'floor_wall_connection_other', label: 'Connection of floor to wall - other', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
+      { id: 'roof_type', label: 'Type of roof', type: 'select', options: ROOF_OPTIONS },
+      { id: 'roof_type_other', label: 'Type of roof - other', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
+      { id: 'roof_wall_connection', label: 'Connection of roof to wall', type: 'select', options: ROOF_CONNECTION_OPTIONS },
+      { id: 'roof_wall_connection_other', label: 'Connection of roof to wall - other', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
+    ]
+  },
+  {
+    label: 'RC Confined Stone Masonry',
+    sheetName: 'RC Confined Stone',
+    fields: [
+      { id: 'no_of_storey', label: 'No. of storey', type: 'select', options: ['single storey', 'double storey'] },
+      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number' },
+      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number' },
+      { id: 'type_of_stone', label: 'Type of stone', type: 'select', options: ['Semi-dressed quarry stone', 'round river-bed stone', 'foliated slate stone'] },
+      { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
+      { id: 'construction_material_distance', label: 'Construction material distance', type: 'number' },
+      { id: 'maximum_stone_size', label: 'Maximum stone size', type: 'select', options: ['>12"', '9"-12"', '6"-9"', '<6"', 'other size'] },
+      { id: 'maximum_stone_size_other', label: 'Maximum stone size (other)', type: 'number', displayWhen: { fieldId: 'maximum_stone_size', equals: 'other size' } },
+      { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Dry/No mortar', 'Mud mortar', 'Cement-sand mortar'] },
+      { id: 'through_stone_provision', label: 'Through stone', type: 'select', options: ['Provided', 'Not provided'] },
+      { id: 'through_stone_spacing', label: 'Through stone typical spacing', type: 'number' },
+      { id: 'external_wall_thickness_category', label: 'External Wall Thickness', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
+      { id: 'external_wall_thickness_specific', label: 'External Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'external_wall_thickness_category', equals: 'specific thickness' } },
+      { id: 'internal_wall_thickness_category', label: 'Internal Wall Thickness', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
+      { id: 'internal_wall_thickness_specific', label: 'Internal Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'internal_wall_thickness_category', equals: 'specific thickness' } },
+      { id: 'window_size_length', label: 'Typical size of window - Length', type: 'number' },
+      { id: 'window_size_height', label: 'Typical size of window - Height', type: 'number' },
+      { id: 'door_size_length', label: 'Typical size of door - Length', type: 'number' },
+      { id: 'door_size_height', label: 'Typical size of door - Height', type: 'number' },
+      { id: 'opening_alignment_vertical', label: 'Opening alignment in vertical direction', type: 'select', options: ['Aligned', 'Not aligned'] },
+      { id: 'wall_column_connection', label: 'Connection between stone masonry wall and vertical confining column', type: 'select', options: ['Toothing provided', 'Not provided'] },
+      { id: 'vertical_confining_size', label: 'Size vertical confining element/column', type: 'number' },
+      { id: 'vertical_confining_location', label: 'Location of vertical confining element/column', type: 'select', options: ['At all corners only', 'At some corners', 'Intermediate elements are also provided'] },
+      { id: 'vertical_confining_max_spacing', label: 'Maximum spacing of vertical confining elements', type: 'number' },
+      { id: 'vertical_opening_elements', label: 'Vertical confining elements at openings', type: 'select', options: ['Provided', 'Not provided'] },
+      { id: 'vertical_opening_elements_size', label: 'Vertical confining elements at openings - size', type: 'number' },
+      { id: 'plinth_band', label: 'Horizontal Plinth bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
+      { id: 'plinth_band_size', label: 'Horizontal Plinth bands/beams - size', type: 'number' },
+      { id: 'lintel_band', label: 'Horizontal Lintel bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
+      { id: 'lintel_band_size', label: 'Horizontal Lintel bands/beams - size', type: 'number' },
+      { id: 'roof_floor_band', label: 'Horizontal Roof/floor bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
+      { id: 'roof_floor_band_size', label: 'Horizontal Roof/floor bands/beams - size', type: 'number' },
+      { id: 'sill_band', label: 'Horizontal Sill bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
+      { id: 'sill_band_size', label: 'Horizontal Sill bands/beams - size', type: 'number' },
+      { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'Stone masonry column'] },
+      { id: 'verandah_column_width', label: 'Verandah column size - width', type: 'number' },
+      { id: 'verandah_column_depth', label: 'Verandah column size - depth', type: 'number' },
+      { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
+      { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
+      { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
+      { id: 'floor_wall_connection_other', label: 'Connection of floor to wall - other', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
+      { id: 'roof_type', label: 'Type of roof', type: 'select', options: ROOF_OPTIONS },
+      { id: 'roof_type_other', label: 'Type of roof - other', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
+      { id: 'roof_wall_connection', label: 'Connection of roof to wall', type: 'select', options: ROOF_CONNECTION_OPTIONS },
+      { id: 'roof_wall_connection_other', label: 'Connection of roof to wall - other', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
+    ]
+  },
+  {
+    label: 'Unreinforced Concrete/Adobe Block Masonry',
+    sheetName: 'UR Block Adobe',
+    fields: [
+      { id: 'no_of_storey', label: 'No. of storey', type: 'select', options: ['single storey', 'double storey'] },
+      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number' },
+      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number' },
+      { id: 'type_of_block', label: 'Type of block', type: 'select', options: ['Concrete solid block', 'Concrete hollow block', 'adobe solid block'] },
+      { id: 'size_of_block_width', label: 'Size of block - width', type: 'number' },
+      { id: 'size_of_block_depth', label: 'Size of block - depth', type: 'number' },
+      { id: 'size_of_block_height', label: 'Size of block - height', type: 'number' },
+      { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
+      { id: 'construction_material_distance', label: 'Construction material distance', type: 'number' },
+      { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Mud mortar', 'Cement-sand mortar'] },
+      { id: 'orthogonal_wall_connection', label: 'Connection between orthogonal walls', type: 'select', options: ['adequate with proper overlap', 'not adequate connection'] },
+      { id: 'wall_thickness', label: 'Wall Thickness', type: 'number' },
+      { id: 'window_size_length', label: 'Typical size of window - Length', type: 'number' },
+      { id: 'window_size_height', label: 'Typical size of window - Height', type: 'number' },
+      { id: 'door_size_length', label: 'Typical size of door - Length', type: 'number' },
+      { id: 'door_size_height', label: 'Typical size of door - Height', type: 'number' },
+      { id: 'lintel_beam_type', label: 'Type of lintel beam', type: 'select', options: ['Continuous on all opening', 'separate on each opening'] },
+      { id: 'opening_alignment_vertical', label: 'Opening alignment in vertical direction', type: 'select', options: ['Aligned', 'Not aligned'] },
+      { id: 'lintel_beam_material', label: 'Material of lintel beam', type: 'select', options: ['wooden beam', 'stone beam', 'RC beam', 'other'] },
+      { id: 'lintel_beam_material_other', label: 'Material of lintel beam - other', type: 'text', displayWhen: { fieldId: 'lintel_beam_material', equals: 'other' } },
+      { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'block masonry column'] },
+      { id: 'verandah_column_width', label: 'Verandah column size - width', type: 'number' },
+      { id: 'verandah_column_depth', label: 'Verandah column size - depth', type: 'number' },
+      { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
+      { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
+      { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
+      { id: 'floor_wall_connection_other', label: 'Connection of floor to wall - other', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
+      { id: 'roof_type', label: 'Type of roof', type: 'select', options: ROOF_OPTIONS },
+      { id: 'roof_type_other', label: 'Type of roof - other', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
+      { id: 'roof_wall_connection', label: 'Connection of roof to wall', type: 'select', options: ROOF_CONNECTION_OPTIONS },
+      { id: 'roof_wall_connection_other', label: 'Connection of roof to wall - other', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
+    ]
+  },
+  {
+    label: 'RC Confined Concrete Block/Adobe Masonry',
+    sheetName: 'RC Confined Block Adobe',
+    fields: [
+      { id: 'no_of_storey', label: 'No. of storey', type: 'select', options: ['single storey', 'double storey'] },
+      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number' },
+      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number' },
+      { id: 'type_of_block', label: 'Type of block', type: 'select', options: ['Concrete solid block', 'Concrete hollow block', 'adobe solid block'] },
+      { id: 'size_of_block_width', label: 'Size of block - width', type: 'number' },
+      { id: 'size_of_block_depth', label: 'Size of block - depth', type: 'number' },
+      { id: 'size_of_block_height', label: 'Size of block - height', type: 'number' },
+      { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
+      { id: 'construction_material_distance', label: 'Construction material distance', type: 'number' },
+      { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Dry/No mortar', 'Mud mortar', 'Cement-sand mortar'] },
+      { id: 'wall_thickness', label: 'Wall Thickness', type: 'number' },
+      { id: 'window_size_length', label: 'Typical size of window - Length', type: 'number' },
+      { id: 'window_size_height', label: 'Typical size of window - Height', type: 'number' },
+      { id: 'door_size_length', label: 'Typical size of door - Length', type: 'number' },
+      { id: 'door_size_height', label: 'Typical size of door - Height', type: 'number' },
+      { id: 'opening_alignment_vertical', label: 'Opening alignment in vertical direction', type: 'select', options: ['Aligned', 'Not aligned'] },
+      { id: 'wall_column_connection', label: 'Connection between block masonry wall and vertical confining column', type: 'select', options: ['Toothing provided', 'Not provided'] },
+      { id: 'vertical_confining_size', label: 'Size vertical confining element/column', type: 'number' },
+      { id: 'vertical_confining_location', label: 'Location of vertical confining element/column', type: 'select', options: ['At all corners only', 'At some corners', 'Intermediate elements are also provided'] },
+      { id: 'vertical_confining_max_spacing', label: 'Maximum spacing of vertical confining elements', type: 'number' },
+      { id: 'vertical_opening_elements', label: 'Vertical confining elements at openings', type: 'select', options: ['Provided', 'Not provided'] },
+      { id: 'vertical_opening_elements_size', label: 'Vertical confining elements at openings - size', type: 'number' },
+      { id: 'plinth_band', label: 'Horizontal Plinth bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
+      { id: 'plinth_band_size', label: 'Horizontal Plinth bands/beams - size', type: 'number' },
+      { id: 'lintel_band', label: 'Horizontal Lintel bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
+      { id: 'lintel_band_size', label: 'Horizontal Lintel bands/beams - size', type: 'number' },
+      { id: 'roof_floor_band', label: 'Horizontal Roof/floor bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
+      { id: 'roof_floor_band_size', label: 'Horizontal Roof/floor bands/beams - size', type: 'number' },
+      { id: 'sill_band', label: 'Horizontal Sill bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
+      { id: 'sill_band_size', label: 'Horizontal Sill bands/beams - size', type: 'text' },
+      { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'block masonry column'] },
+      { id: 'verandah_column_width', label: 'Verandah column size - width', type: 'number' },
+      { id: 'verandah_column_depth', label: 'Verandah column size - depth', type: 'number' },
+      { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
+      { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
+      { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
+      { id: 'floor_wall_connection_other', label: 'Connection of floor to wall - other', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
+      { id: 'roof_type', label: 'Type of roof', type: 'select', options: ROOF_OPTIONS },
+      { id: 'roof_type_other', label: 'Type of roof - other', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
+      { id: 'roof_wall_connection', label: 'Connection of roof to wall', type: 'select', options: ROOF_CONNECTION_OPTIONS },
+      { id: 'roof_wall_connection_other', label: 'Connection of roof to wall - other', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
+    ]
+  }
+];
+
+const TYPOLOGY_DEFINITION_MAP: Record<string, TypologyDefinition> = TYPOLOGY_DEFINITIONS.reduce((acc, item) => {
+  acc[item.label] = item;
+  return acc;
+}, {} as Record<string, TypologyDefinition>);
+
+const emptyTypologyData = (): TypologySpecificData => ({ selected_type: '', responses: {} });
+
+const parseTypologySpecificData = (raw: any): TypologySpecificData => {
+  if (!raw) return emptyTypologyData();
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return {
+        selected_type: typeof parsed?.selected_type === 'string' ? parsed.selected_type : '',
+        responses: typeof parsed?.responses === 'object' && parsed?.responses ? parsed.responses : {}
+      };
+    } catch {
+      return emptyTypologyData();
+    }
+  }
+  if (typeof raw === 'object') {
+    return {
+      selected_type: typeof raw?.selected_type === 'string' ? raw.selected_type : '',
+      responses: typeof raw?.responses === 'object' && raw?.responses ? raw.responses : {}
+    };
+  }
+  return emptyTypologyData();
+};
+
 // ==========================================
 // 2. SUB-COMPONENTS
 // ==========================================
@@ -384,6 +661,44 @@ export default function BuildingForm() {
       date: 'Date'
     };
     return labels[type];
+  };
+
+  const getTypologyDataFromSource = (source: Record<string, any>): TypologySpecificData => {
+    return parseTypologySpecificData(source?.typology_specific_data);
+  };
+
+  const getCurrentTypologyData = (): TypologySpecificData => {
+    return getTypologyDataFromSource(formData);
+  };
+
+  const updateTypologySelectedType = (selectedType: string) => {
+    setFormData(prev => {
+      const current = getTypologyDataFromSource(prev);
+      const next: TypologySpecificData = {
+        selected_type: selectedType,
+        responses: selectedType === current.selected_type ? current.responses : {}
+      };
+      return { ...prev, typology_specific_data: next };
+    });
+  };
+
+  const updateTypologyResponse = (fieldId: string, value: any) => {
+    setFormData(prev => {
+      const current = getTypologyDataFromSource(prev);
+      const next: TypologySpecificData = {
+        selected_type: current.selected_type,
+        responses: {
+          ...current.responses,
+          [fieldId]: value
+        }
+      };
+      return { ...prev, typology_specific_data: next };
+    });
+  };
+
+  const isTypologyFieldVisible = (field: TypologyField, responses: Record<string, any>): boolean => {
+    if (!field.displayWhen) return true;
+    return responses?.[field.displayWhen.fieldId] === field.displayWhen.equals;
   };
 
   const countFieldUsage = (fieldId: string): number => {
@@ -1152,247 +1467,171 @@ export default function BuildingForm() {
 
   const exportToExcel = async (subset?: BuildingReport[]) => {
     const dataToExport = (subset || reports).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-    if (dataToExport.length === 0) return alert("No data.");
+    if (dataToExport.length === 0) return alert('No data.');
 
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Data');
-    
-    // Identify all field types
-    const imageFields = new Map<string, number>();
-    const dynamicSeriesFields = new Map<string, string[]>();
-    const hiddenFields = ['__startTime', '__endTime', '__duration'];
+    const generalSheet = workbook.addWorksheet('General Data');
 
-    dataToExport.forEach(r => {
-      Object.entries(r.full_data).forEach(([k, v]) => {
-        if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].url) {
-          imageFields.set(k, Math.max(imageFields.get(k) || 0, v.length));
-        } else if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0].label && v[0].value !== undefined) {
-          const labels = v.map((item: DynamicSeriesItem) => item.label);
-          dynamicSeriesFields.set(k, labels);
+    const hiddenLabels = new Set(['__startTime', '__endTime', '__duration']);
+    const dynamicSeriesLabelMap = new Map<string, string[]>();
+
+    dataToExport.forEach(report => {
+      Object.entries(report.full_data || {}).forEach(([key, value]) => {
+        if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && value[0].label && value[0].value !== undefined) {
+          dynamicSeriesLabelMap.set(key, value.map((item: DynamicSeriesItem) => item.label));
         }
       });
     });
 
-    // Build field structure (rows in transposed view)
-    interface FieldRow {
-      label: string;
-      section: string;
-      getData: (report: BuildingReport) => any;
+    interface GeneralColumn {
+      header: string;
+      getValue: (report: BuildingReport) => any;
     }
-    const fieldRows: FieldRow[] = [];
 
-    // Add metadata rows
-    fieldRows.push({
-      label: 'SURVEYOR NAME',
-      section: 'METADATA',
-      getData: (r) => r.full_data['Surveyor Name'] || ''
-    });
-    fieldRows.push({
-      label: 'BUILDING ID',
-      section: 'METADATA',
-      getData: (r) => r.building_id
-    });
-    fieldRows.push({
-      label: 'DATE SUBMITTED',
-      section: 'METADATA',
-      getData: (r) => new Date(r.created_at).toLocaleDateString()
-    });
+    const generalColumns: GeneralColumn[] = [
+      {
+        header: 'building_id',
+        getValue: (report) => report.full_data?.['Building ID'] || report.building_id || report.id || ''
+      },
+      {
+        header: 'Typology Selected',
+        getValue: (report) => parseTypologySpecificData(report.full_data?.typology_specific_data).selected_type || ''
+      },
+      {
+        header: 'Surveyor Name',
+        getValue: (report) => report.full_data?.['Surveyor Name'] || ''
+      },
+      {
+        header: 'Date Submitted',
+        getValue: (report) => report.created_at ? new Date(report.created_at).toLocaleDateString() : ''
+      }
+    ];
 
-    // Add fields by section
     sections.forEach(section => {
       section.fields.forEach(field => {
-        if (!hiddenFields.includes(field.label) && field.label !== 'Building ID' && field.label !== 'Surveyor Name') {
-          if (field.type === 'group' && field.subFields) {
-            field.subFields.forEach(sub => {
-              const key = `${field.label} [${sub.label}]`;
-              fieldRows.push({
-                label: key.toUpperCase(),
-                section: section.title,
-                getData: (r) => r.full_data[key] || ''
-              });
+        if (hiddenLabels.has(field.label) || field.label === 'Building ID' || field.label === 'Surveyor Name') return;
+
+        if (field.type === 'group' && field.subFields) {
+          field.subFields.forEach(sub => {
+            const key = `${field.label} [${sub.label}]`;
+            generalColumns.push({
+              header: `${section.title} | ${key}`,
+              getValue: (report) => report.full_data?.[key] ?? ''
             });
-          } else if (field.type === 'image') {
-            const max = imageFields.get(field.label) || 0;
-            for (let i = 1; i <= max; i++) {
-              const baseLabel = `${field.label.toUpperCase()} ${i}`;
-              fieldRows.push({
-                label: baseLabel,
-                section: section.title,
-                getData: (r) => {
-                  const photos = Array.isArray(r.full_data[field.label]) ? r.full_data[field.label] : [];
-                  const p = photos[i - 1];
-                  return p ? { text: p.label || `Photo ${i}`, hyperlink: p.url, tooltip: 'Click to view' } : '';
-                }
-              });
+          });
+          return;
+        }
+
+        if (field.type === 'image') {
+          generalColumns.push({
+            header: `${section.title} | ${field.label}`,
+            getValue: (report) => {
+              const photos = Array.isArray(report.full_data?.[field.label]) ? report.full_data[field.label] : [];
+              return photos.map((photo: ImageObject, idx: number) => `${photo.label || `Photo ${idx + 1}`}: ${photo.url}`).join(' | ');
             }
-          } else if (field.type === 'dynamic_series') {
-            const labels = dynamicSeriesFields.get(field.label) || [];
-            labels.forEach(label => {
-              const key = `${field.label} [${label}]`;
-              fieldRows.push({
-                label: key.toUpperCase(),
-                section: section.title,
-                getData: (r) => {
-                  const items = Array.isArray(r.full_data[field.label]) ? r.full_data[field.label] : [];
-                  const item = items.find((i: DynamicSeriesItem) => i.label === label);
-                  return item ? item.value : '';
-                }
-              });
+          });
+          return;
+        }
+
+        if (field.type === 'dynamic_series') {
+          const labels = dynamicSeriesLabelMap.get(field.label) || [];
+          if (labels.length === 0) {
+            generalColumns.push({
+              header: `${section.title} | ${field.label}`,
+              getValue: () => ''
             });
           } else {
-            fieldRows.push({
-              label: field.label.toUpperCase(),
-              section: section.title,
-              getData: (r) => {
-                const val = r.full_data[field.label];
-                return Array.isArray(val) ? val.join(', ') : val ?? '';
-              }
+            labels.forEach(label => {
+              generalColumns.push({
+                header: `${section.title} | ${field.label} [${label}]`,
+                getValue: (report) => {
+                  const rows = Array.isArray(report.full_data?.[field.label]) ? report.full_data[field.label] : [];
+                  const match = rows.find((item: DynamicSeriesItem) => item.label === label);
+                  return match?.value ?? '';
+                }
+              });
             });
           }
+          return;
         }
-      });
-    });
 
-    // Add hidden timing fields
-    fieldRows.push({
-      label: 'START TIME',
-      section: 'TIMING',
-      getData: (r) => r.full_data['__startTime'] ? new Date(r.full_data['__startTime']).toLocaleString() : ''
-    });
-    fieldRows.push({
-      label: 'END TIME',
-      section: 'TIMING',
-      getData: (r) => r.full_data['__endTime'] ? new Date(r.full_data['__endTime']).toLocaleString() : ''
-    });
-    fieldRows.push({
-      label: 'DURATION (SECONDS)',
-      section: 'TIMING',
-      getData: (r) => r.full_data['__duration'] ? `${Math.floor(r.full_data['__duration'] / 60)}m ${r.full_data['__duration'] % 60}s` : ''
-    });
-
-    // Build columns (reports + label column)
-    const columns: any[] = [{ header: 'FIELD NAME', key: 'fieldName', width: 25 }];
-    dataToExport.forEach((r, idx) => {
-      const reportLabel = `${r.full_data['Surveyor Name'] || 'Unknown'}-${r.building_id}`;
-      columns.push({
-        header: reportLabel,
-        key: `report_${idx}`,
-        width: 20
-      });
-    });
-    worksheet.columns = columns;
-
-    // Add section header row (merged cells for sections)
-    const sectionHeaderRow = worksheet.insertRow(1, []);
-    sectionHeaderRow.getCell(1).value = 'FIELD NAME';
-    sectionHeaderRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF085394' } };
-    sectionHeaderRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-    sectionHeaderRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-
-    // For report columns, we could add generic header or report date
-    for (let i = 2; i <= columns.length; i++) {
-      const report = dataToExport[i - 2];
-      sectionHeaderRow.getCell(i).value = new Date(report.created_at).toLocaleDateString();
-      sectionHeaderRow.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF001F3F' } };
-      sectionHeaderRow.getCell(i).font = { bold: true, size: 10, color: { argb: 'FF39CCCC' } };
-      sectionHeaderRow.getCell(i).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-    }
-    sectionHeaderRow.height = 30;
-
-    // Add field rows
-    let currentSection = '';
-    let sectionCounter = 0;
-    fieldRows.forEach(fieldRow => {
-      // Add section header row if section changes
-      if (fieldRow.section !== currentSection && fieldRow.section !== 'METADATA') {
-        sectionCounter++;
-        const sectionSeparator = worksheet.addRow({});
-        const rowNum = sectionSeparator.number;
-        
-        // Merge cells across all report columns FIRST
-        worksheet.mergeCells(rowNum, 1, rowNum, columns.length);
-        
-        const mergedCell = sectionSeparator.getCell(1);
-        mergedCell.value = `${sectionCounter}. [${fieldRow.section}]`;
-        // Use a distinct color for section headers (forest green)
-        mergedCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF27AE60' } };
-        mergedCell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-        mergedCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-        
-        sectionSeparator.height = 30;
-        currentSection = fieldRow.section;
-      }
-
-      const row: any = { fieldName: fieldRow.label };
-      dataToExport.forEach((r, idx) => {
-        row[`report_${idx}`] = fieldRow.getData(r);
-      });
-      worksheet.addRow(row);
-    });
-
-    // Format all rows with borders and centered alignment
-    worksheet.eachRow((row, i) => {
-      row.eachCell((cell, colNum) => {
-        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-
-        if (i === 1) {
-          // Header row already formatted
-          if (colNum === 1) {
-            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        generalColumns.push({
+          header: `${section.title} | ${field.label}`,
+          getValue: (report) => {
+            const value = report.full_data?.[field.label];
+            if (Array.isArray(value)) return value.join(', ');
+            return value ?? '';
           }
-        } else if (cell.value?.toString().match(/^\d+\. \[.*\]$/)) {
-          // Section separator rows - format as headers with green color and center alignment (only if it matches "1. [SECTION]" pattern)
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF27AE60' } };
-          cell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        } else if (colNum === 1) {
-          // Field name column - left aligned
-          cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-        } else {
-          // Data cells - centered
-          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        }
+        });
       });
     });
 
-    // Auto-fit columns to content
-    worksheet.columns.forEach(col => {
-      let maxLength = (col.header?.toString() || '').length || 10;
-      worksheet.eachRow(row => {
-        const cell = row.getCell(col.key!);
-        const cellValue = cell.value?.toString() || '';
-        maxLength = Math.max(maxLength, cellValue.length);
-      });
-      col.width = Math.min(Math.max(maxLength + 2, 15), 50);
+    generalSheet.addRow(generalColumns.map(col => col.header));
+    dataToExport.forEach(report => {
+      generalSheet.addRow(generalColumns.map(col => col.getValue(report)));
     });
 
-    // Auto-adjust row heights based on content
-    worksheet.eachRow((row, rowNum) => {
-      let maxHeight = 20;
-      row.eachCell((cell, colNum) => {
-        if (cell.value) {
-          const cellText = cell.value.toString();
-          const colWidth = worksheet.columns[colNum - 1]?.width || 20;
-          // Estimate number of lines based on text length and column width
-          const estimatedLines = Math.ceil(cellText.length / (colWidth * 0.7));
-          // Calculate height: 15px per line (approximate)
-          const estimatedHeight = estimatedLines * 15 + 10;
-          maxHeight = Math.max(maxHeight, estimatedHeight);
-        }
+    const typologySheetMap = new Map<string, ExcelJS.Worksheet>();
+    TYPOLOGY_DEFINITIONS.forEach(def => {
+      const sheet = workbook.addWorksheet(def.sheetName);
+      sheet.addRow(['building_id', ...def.fields.map(field => field.label)]);
+      typologySheetMap.set(def.label, sheet);
+    });
+
+    dataToExport.forEach(report => {
+      const parsed = parseTypologySpecificData(report.full_data?.typology_specific_data);
+      const selectedDef = TYPOLOGY_DEFINITION_MAP[parsed.selected_type];
+      if (!selectedDef) return;
+
+      const selectedSheet = typologySheetMap.get(selectedDef.label);
+      if (!selectedSheet) return;
+
+      const buildingId = report.full_data?.['Building ID'] || report.building_id || report.id || '';
+      const row = [
+        buildingId,
+        ...selectedDef.fields.map(field => {
+          if (!isTypologyFieldVisible(field, parsed.responses || {})) return '';
+          const value = parsed.responses?.[field.id];
+          if (value === undefined || value === null) return '';
+          if (Array.isArray(value)) return value.join(', ');
+          return value;
+        })
+      ];
+      selectedSheet.addRow(row);
+    });
+
+    const allSheets = [generalSheet, ...Array.from(typologySheetMap.values())];
+    allSheets.forEach(sheet => {
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF001F3F' } };
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      headerRow.height = 28;
+
+      sheet.eachRow((row) => {
+        row.eachCell(cell => {
+          cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+        });
       });
-      // Set minimum heights for specific row types
-      if (rowNum === 1) {
-        row.height = Math.max(maxHeight, 30); // Header row
-      } else if (row.getCell(1).value?.toString().match(/^\d+\. \[.*\]$/)) {
-        row.height = Math.max(maxHeight, 30); // Section headers
-      } else {
-        row.height = Math.max(maxHeight, 22); // Data rows with minimum height
-      }
+
+      sheet.columns.forEach((column, index) => {
+        let maxLength = 14;
+        column.eachCell?.({ includeEmpty: true }, (cell) => {
+          const text = cell?.value?.toString() || '';
+          maxLength = Math.max(maxLength, text.length + 2);
+        });
+        column.width = index === 0 ? Math.max(16, Math.min(maxLength, 28)) : Math.min(maxLength, 42);
+      });
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     saveAs(blob, `UET_EPFL_Report_${Date.now()}.xlsx`);
   };
 
@@ -1546,6 +1785,9 @@ export default function BuildingForm() {
         return true;
     }
   };
+
+  const currentTypologyData = getCurrentTypologyData();
+  const selectedTypologyDefinition = currentTypologyData.selected_type ? TYPOLOGY_DEFINITION_MAP[currentTypologyData.selected_type] : undefined;
 
   return (
     <div className={`max-w-screen-lg mx-auto px-4 pb-32 pt-6 space-y-8 min-h-screen ${darkMode ? 'bg-slate-900 text-white' : 'bg-[#F5F5F5] text-black'}`}>
@@ -2126,8 +2368,8 @@ export default function BuildingForm() {
                                 </div>
 
                                 {/* Type Selector */}
-                                <div className="grid grid-cols-6 gap-1">
-                                  {(['text', 'number', 'select', 'checkbox', 'image', 'gps'] as FieldType[]).map(type => (
+                                <div className="grid grid-cols-5 gap-1">
+                                  {(['text', 'date', 'number', 'select', 'multi_select', 'checkbox', 'image', 'gps', 'group', 'dynamic_series'] as FieldType[]).map(type => (
                                     <button key={type} onClick={async () => { setFieldSaveStatus('saving'); setEditFieldType(type); await updateFieldTypeAsync(editingFieldSectionId, editingFieldId, type); setFieldSaveStatus('saved'); setTimeout(() => setFieldSaveStatus('idle'), 2000); }} className={`p-2 rounded text-[10px] font-bold border-2 transition-all ${editFieldType === type ? 'border-[#001F3F] bg-[#001F3F] text-white' : 'border-[#AAAAAA] bg-white text-[#001F3F] hover:border-[#001F3F]'}`} title={getFieldTypeLabel(type)}>{getFieldTypeIcon(type)}</button>
                                   ))}
                                 </div>
@@ -2152,6 +2394,68 @@ export default function BuildingForm() {
                 </div>
             </div>
         ))}
+
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 border-b-4 border-[#001F3F] pb-2">
+            <Layers className="text-[#001F3F]" size={20} />
+            <h2 className="text-sm font-black text-[#001F3F] uppercase tracking-widest">Building Typology</h2>
+          </div>
+
+          <div className="bg-white p-4 sm:p-6 rounded-2xl border-2 border-slate-100 shadow-sm relative hover:border-blue-200 transition-colors">
+            <div className="mb-3">
+              <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">Typology Selection</label>
+              <div className="relative mt-2">
+                <select
+                  className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] appearance-none text-[#111111] outline-none"
+                  value={currentTypologyData.selected_type || ''}
+                  onChange={(e) => updateTypologySelectedType(e.target.value)}
+                >
+                  <option value="">Select...</option>
+                  {TYPOLOGY_DEFINITIONS.map(def => (
+                    <option key={def.label} value={def.label}>{def.label}</option>
+                  ))}
+                </select>
+                <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-[#AAAAAA]" size={20} />
+              </div>
+            </div>
+
+            {selectedTypologyDefinition && (
+              <div className="grid grid-cols-1 gap-4">
+                {selectedTypologyDefinition.fields.map(field => {
+                  if (!isTypologyFieldVisible(field, currentTypologyData.responses || {})) return null;
+                  return (
+                  <div key={field.id}>
+                    <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">{field.label}</label>
+                    {field.type === 'select' ? (
+                      <div className="relative mt-1">
+                        <select
+                          className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] appearance-none text-[#111111] outline-none"
+                          value={currentTypologyData.responses?.[field.id] || ''}
+                          onChange={(e) => updateTypologyResponse(field.id, e.target.value)}
+                        >
+                          <option value="">Select...</option>
+                          {(field.options || []).map(option => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                        <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-[#AAAAAA]" size={20} />
+                      </div>
+                    ) : (
+                      <input
+                        type={field.type === 'number' ? 'number' : 'text'}
+                        className="w-full mt-1 p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]"
+                        placeholder="..."
+                        value={currentTypologyData.responses?.[field.id] || ''}
+                        onChange={(e) => updateTypologyResponse(field.id, e.target.value)}
+                      />
+                    )}
+                  </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {!isAdmin && (
@@ -2251,6 +2555,7 @@ export default function BuildingForm() {
                   <div key={f.id} className="space-y-1">
                     <label className="text-[10px] font-bold uppercase text-slate-900">{f.label}</label>
                     {f.type === 'text' && <input type="text" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
+                    {f.type === 'date' && <input type="date" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
                     {f.type === 'number' && <input type="number" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
                     {f.type === 'select' && (
                        <select className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)}>
