@@ -128,7 +128,7 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'maximum_stone_size_other', label: 'Maximum stone size (other)', type: 'number', displayWhen: { fieldId: 'maximum_stone_size', equals: 'other size' } },
       { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Dry/No mortar', 'Mud mortar', 'Cement-sand mortar'] },
       { id: 'through_stone_provision', label: 'Through stone', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'through_stone_spacing', label: 'Through stone typical spacing', type: 'text' },
+      { id: 'through_stone_spacing', label: 'Through stone typical spacing', type: 'text', displayWhen: { fieldId: 'through_stone_provision', equals: 'Provided' } },
       { id: 'orthogonal_wall_connection', label: 'Connection between orthogonal walls', type: 'select', options: ['through stone provided', 'not adequate connection'] },
       { id: 'external_wall_thickness_category', label: 'External Wall Thickness', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
       { id: 'external_wall_thickness_specific', label: 'External Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'external_wall_thickness_category', equals: 'specific thickness' } },
@@ -209,7 +209,7 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'maximum_stone_size_other', label: 'Maximum stone size (other)', type: 'number', displayWhen: { fieldId: 'maximum_stone_size', equals: 'other size' } },
       { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Dry/No mortar', 'Mud mortar', 'Cement-sand mortar'] },
       { id: 'through_stone_provision', label: 'Through stone', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'through_stone_spacing', label: 'Through stone typical spacing', type: 'number' },
+      { id: 'through_stone_spacing', label: 'Through stone typical spacing', type: 'number', displayWhen: { fieldId: 'through_stone_provision', equals: 'Provided' } },
       { id: 'external_wall_thickness_category', label: 'External Wall Thickness', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
       { id: 'external_wall_thickness_specific', label: 'External Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'external_wall_thickness_category', equals: 'specific thickness' } },
       { id: 'internal_wall_thickness_category', label: 'Internal Wall Thickness', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
@@ -224,15 +224,15 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'vertical_confining_location', label: 'Location of vertical confining element/column', type: 'select', options: ['At all corners only', 'At some corners', 'Intermediate elements are also provided'] },
       { id: 'vertical_confining_max_spacing', label: 'Maximum spacing of vertical confining elements', type: 'number' },
       { id: 'vertical_opening_elements', label: 'Vertical confining elements at openings', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'vertical_opening_elements_size', label: 'Vertical confining elements at openings - size', type: 'number' },
+      { id: 'vertical_opening_elements_size', label: 'Vertical confining elements at openings - size', type: 'number', displayWhen: { fieldId: 'vertical_opening_elements', equals: 'Provided' } },
       { id: 'plinth_band', label: 'Horizontal Plinth bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'plinth_band_size', label: 'Horizontal Plinth bands/beams - size', type: 'number' },
+      { id: 'plinth_band_size', label: 'Horizontal Plinth bands/beams - size', type: 'number', displayWhen: { fieldId: 'plinth_band', equals: 'Provided' } },
       { id: 'lintel_band', label: 'Horizontal Lintel bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'lintel_band_size', label: 'Horizontal Lintel bands/beams - size', type: 'number' },
+      { id: 'lintel_band_size', label: 'Horizontal Lintel bands/beams - size', type: 'number', displayWhen: { fieldId: 'lintel_band', equals: 'Provided' } },
       { id: 'roof_floor_band', label: 'Horizontal Roof/floor bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'roof_floor_band_size', label: 'Horizontal Roof/floor bands/beams - size', type: 'number' },
+      { id: 'roof_floor_band_size', label: 'Horizontal Roof/floor bands/beams - size', type: 'number', displayWhen: { fieldId: 'roof_floor_band', equals: 'Provided' } },
       { id: 'sill_band', label: 'Horizontal Sill bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'sill_band_size', label: 'Horizontal Sill bands/beams - size', type: 'number' },
+      { id: 'sill_band_size', label: 'Horizontal Sill bands/beams - size', type: 'number', displayWhen: { fieldId: 'sill_band', equals: 'Provided' } },
       { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'Stone masonry column'] },
       { id: 'verandah_column_width', label: 'Verandah column size - width', type: 'number' },
       { id: 'verandah_column_depth', label: 'Verandah column size - depth', type: 'number' },
@@ -308,15 +308,15 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'vertical_confining_location', label: 'Location of vertical confining element/column', type: 'select', options: ['At all corners only', 'At some corners', 'Intermediate elements are also provided'] },
       { id: 'vertical_confining_max_spacing', label: 'Maximum spacing of vertical confining elements', type: 'number' },
       { id: 'vertical_opening_elements', label: 'Vertical confining elements at openings', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'vertical_opening_elements_size', label: 'Vertical confining elements at openings - size', type: 'number' },
+      { id: 'vertical_opening_elements_size', label: 'Vertical confining elements at openings - size', type: 'number', displayWhen: { fieldId: 'vertical_opening_elements', equals: 'Provided' } },
       { id: 'plinth_band', label: 'Horizontal Plinth bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'plinth_band_size', label: 'Horizontal Plinth bands/beams - size', type: 'number' },
+      { id: 'plinth_band_size', label: 'Horizontal Plinth bands/beams - size', type: 'number', displayWhen: { fieldId: 'plinth_band', equals: 'Provided' } },
       { id: 'lintel_band', label: 'Horizontal Lintel bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'lintel_band_size', label: 'Horizontal Lintel bands/beams - size', type: 'number' },
+      { id: 'lintel_band_size', label: 'Horizontal Lintel bands/beams - size', type: 'number', displayWhen: { fieldId: 'lintel_band', equals: 'Provided' } },
       { id: 'roof_floor_band', label: 'Horizontal Roof/floor bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'roof_floor_band_size', label: 'Horizontal Roof/floor bands/beams - size', type: 'number' },
+      { id: 'roof_floor_band_size', label: 'Horizontal Roof/floor bands/beams - size', type: 'number', displayWhen: { fieldId: 'roof_floor_band', equals: 'Provided' } },
       { id: 'sill_band', label: 'Horizontal Sill bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'sill_band_size', label: 'Horizontal Sill bands/beams - size', type: 'text' },
+      { id: 'sill_band_size', label: 'Horizontal Sill bands/beams - size', type: 'number', displayWhen: { fieldId: 'sill_band', equals: 'Provided' } },
       { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'block masonry column'] },
       { id: 'verandah_column_width', label: 'Verandah column size - width', type: 'number' },
       { id: 'verandah_column_depth', label: 'Verandah column size - depth', type: 'number' },
@@ -575,6 +575,7 @@ export default function BuildingForm() {
   const [showExportImport, setShowExportImport] = useState(false);
   const [adminTab, setAdminTab] = useState<'schema' | 'logic' | 'preview' | 'access'>('schema');
   const [draggedFieldId, setDraggedFieldId] = useState<string | null>(null);
+  const [surveyTab, setSurveyTab] = useState<'general' | 'typology'>('general');
 
   // NEW: Autosave, Dark Mode, Filters, Audit Log
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -1470,8 +1471,6 @@ export default function BuildingForm() {
     if (dataToExport.length === 0) return alert('No data.');
 
     const workbook = new ExcelJS.Workbook();
-    const generalSheet = workbook.addWorksheet('General Data');
-
     const hiddenLabels = new Set(['__startTime', '__endTime', '__duration']);
     const dynamicSeriesLabelMap = new Map<string, string[]>();
 
@@ -1483,26 +1482,119 @@ export default function BuildingForm() {
       });
     });
 
-    interface GeneralColumn {
-      header: string;
+    interface TransposedRow {
+      section: string;
+      question: string;
       getValue: (report: BuildingReport) => any;
+      isImage?: boolean;
     }
 
-    const generalColumns: GeneralColumn[] = [
+    const addTransposedSheet = (sheetName: string, rows: TransposedRow[], sheetReports: BuildingReport[]) => {
+      const sheet = workbook.addWorksheet(sheetName);
+      const surveyHeaders = sheetReports.map(report => report.full_data?.['Building ID'] || report.building_id || report.id || 'Unknown Survey');
+      const lastCol = Math.max(1, surveyHeaders.length + 1);
+
+      sheet.views = [{ state: 'frozen', xSplit: 1, ySplit: 1 }];
+
+      const headerRow = sheet.getRow(1);
+      headerRow.getCell(1).value = 'Question';
+      surveyHeaders.forEach((header, index) => {
+        headerRow.getCell(index + 2).value = header;
+      });
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF001F3F' } };
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      headerRow.height = 24;
+
+      let rowIndex = 2;
+      let activeSection = '';
+
+      rows.forEach(row => {
+        if (row.section !== activeSection) {
+          activeSection = row.section;
+          const startSectionRow = rowIndex;
+          const endSectionRow = rowIndex + 2;
+          sheet.mergeCells(startSectionRow, 1, endSectionRow, lastCol);
+          const sectionCell = sheet.getCell(startSectionRow, 1);
+          sectionCell.value = activeSection;
+          sectionCell.font = { bold: true, color: { argb: 'FF111111' }, size: 12 };
+          sectionCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFDC00' } };
+          sectionCell.alignment = { horizontal: 'center', vertical: 'middle' };
+          rowIndex = endSectionRow + 1;
+        }
+
+        const questionCell = sheet.getCell(rowIndex, 1);
+        questionCell.value = row.question;
+        questionCell.font = { bold: true, color: { argb: 'FF111111' } };
+        questionCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+
+        sheetReports.forEach((report, reportIndex) => {
+          const cell = sheet.getCell(rowIndex, reportIndex + 2);
+          const value = row.getValue(report);
+
+          if (row.isImage) {
+            const photos = Array.isArray(value) ? value as ImageObject[] : [];
+            if (photos.length > 0) {
+              const caption = photos.map((photo, idx) => (photo.label && photo.label.trim()) ? photo.label : `Photo ${idx + 1}`).join(' | ');
+              const targetUrl = photos.find(photo => photo.url)?.url;
+              if (targetUrl) {
+                cell.value = { text: caption, hyperlink: targetUrl };
+                cell.font = { color: { argb: 'FF1D4ED8' }, underline: true };
+              } else {
+                cell.value = caption;
+              }
+            } else {
+              cell.value = '';
+            }
+          } else if (Array.isArray(value)) {
+            cell.value = value.join(', ');
+          } else {
+            cell.value = value ?? '';
+          }
+        });
+
+        rowIndex += 1;
+      });
+
+      const finalRow = Math.max(1, rowIndex - 1);
+      for (let r = 1; r <= finalRow; r++) {
+        for (let c = 1; c <= lastCol; c++) {
+          const cell = sheet.getCell(r, c);
+          cell.alignment = { horizontal: c === 1 ? 'left' : 'center', vertical: 'middle', wrapText: true };
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+        }
+      }
+
+      sheet.getColumn(1).width = 58;
+      for (let c = 2; c <= lastCol; c++) {
+        sheet.getColumn(c).width = 26;
+      }
+    };
+
+    const generalRows: TransposedRow[] = [
       {
-        header: 'building_id',
+        section: 'Survey Metadata',
+        question: 'Building ID',
         getValue: (report) => report.full_data?.['Building ID'] || report.building_id || report.id || ''
       },
       {
-        header: 'Typology Selected',
+        section: 'Survey Metadata',
+        question: 'Typology Selected',
         getValue: (report) => parseTypologySpecificData(report.full_data?.typology_specific_data).selected_type || ''
       },
       {
-        header: 'Surveyor Name',
+        section: 'Survey Metadata',
+        question: 'Surveyor Name',
         getValue: (report) => report.full_data?.['Surveyor Name'] || ''
       },
       {
-        header: 'Date Submitted',
+        section: 'Survey Metadata',
+        question: 'Date Submitted',
         getValue: (report) => report.created_at ? new Date(report.created_at).toLocaleDateString() : ''
       }
     ];
@@ -1514,21 +1606,11 @@ export default function BuildingForm() {
         if (field.type === 'group' && field.subFields) {
           field.subFields.forEach(sub => {
             const key = `${field.label} [${sub.label}]`;
-            generalColumns.push({
-              header: `${section.title} | ${key}`,
+            generalRows.push({
+              section: section.title,
+              question: key,
               getValue: (report) => report.full_data?.[key] ?? ''
             });
-          });
-          return;
-        }
-
-        if (field.type === 'image') {
-          generalColumns.push({
-            header: `${section.title} | ${field.label}`,
-            getValue: (report) => {
-              const photos = Array.isArray(report.full_data?.[field.label]) ? report.full_data[field.label] : [];
-              return photos.map((photo: ImageObject, idx: number) => `${photo.label || `Photo ${idx + 1}`}: ${photo.url}`).join(' | ');
-            }
           });
           return;
         }
@@ -1536,14 +1618,16 @@ export default function BuildingForm() {
         if (field.type === 'dynamic_series') {
           const labels = dynamicSeriesLabelMap.get(field.label) || [];
           if (labels.length === 0) {
-            generalColumns.push({
-              header: `${section.title} | ${field.label}`,
+            generalRows.push({
+              section: section.title,
+              question: field.label,
               getValue: () => ''
             });
           } else {
             labels.forEach(label => {
-              generalColumns.push({
-                header: `${section.title} | ${field.label} [${label}]`,
+              generalRows.push({
+                section: section.title,
+                question: `${field.label} [${label}]`,
                 getValue: (report) => {
                   const rows = Array.isArray(report.full_data?.[field.label]) ? report.full_data[field.label] : [];
                   const match = rows.find((item: DynamicSeriesItem) => item.label === label);
@@ -1555,79 +1639,44 @@ export default function BuildingForm() {
           return;
         }
 
-        generalColumns.push({
-          header: `${section.title} | ${field.label}`,
-          getValue: (report) => {
-            const value = report.full_data?.[field.label];
-            if (Array.isArray(value)) return value.join(', ');
-            return value ?? '';
-          }
+        if (field.type === 'image') {
+          generalRows.push({
+            section: section.title,
+            question: field.label,
+            getValue: (report) => Array.isArray(report.full_data?.[field.label]) ? report.full_data[field.label] : [],
+            isImage: true
+          });
+          return;
+        }
+
+        generalRows.push({
+          section: section.title,
+          question: field.label,
+          getValue: (report) => report.full_data?.[field.label] ?? ''
         });
       });
     });
 
-    generalSheet.addRow(generalColumns.map(col => col.header));
-    dataToExport.forEach(report => {
-      generalSheet.addRow(generalColumns.map(col => col.getValue(report)));
-    });
+    addTransposedSheet('General Data', generalRows, dataToExport);
 
-    const typologySheetMap = new Map<string, ExcelJS.Worksheet>();
     TYPOLOGY_DEFINITIONS.forEach(def => {
-      const sheet = workbook.addWorksheet(def.sheetName);
-      sheet.addRow(['building_id', ...def.fields.map(field => field.label)]);
-      typologySheetMap.set(def.label, sheet);
-    });
-
-    dataToExport.forEach(report => {
-      const parsed = parseTypologySpecificData(report.full_data?.typology_specific_data);
-      const selectedDef = TYPOLOGY_DEFINITION_MAP[parsed.selected_type];
-      if (!selectedDef) return;
-
-      const selectedSheet = typologySheetMap.get(selectedDef.label);
-      if (!selectedSheet) return;
-
-      const buildingId = report.full_data?.['Building ID'] || report.building_id || report.id || '';
-      const row = [
-        buildingId,
-        ...selectedDef.fields.map(field => {
+      const rows: TransposedRow[] = def.fields.map(field => ({
+        section: def.label,
+        question: field.label,
+        getValue: (report) => {
+          const parsed = parseTypologySpecificData(report.full_data?.typology_specific_data);
+          if (parsed.selected_type !== def.label) return '';
           if (!isTypologyFieldVisible(field, parsed.responses || {})) return '';
-          const value = parsed.responses?.[field.id];
-          if (value === undefined || value === null) return '';
-          if (Array.isArray(value)) return value.join(', ');
-          return value;
-        })
-      ];
-      selectedSheet.addRow(row);
-    });
+          return parsed.responses?.[field.id] ?? '';
+        }
+      }));
 
-    const allSheets = [generalSheet, ...Array.from(typologySheetMap.values())];
-    allSheets.forEach(sheet => {
-      const headerRow = sheet.getRow(1);
-      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF001F3F' } };
-      headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      headerRow.height = 28;
-
-      sheet.eachRow((row) => {
-        row.eachCell(cell => {
-          cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-          cell.border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' }
-          };
-        });
+      const typologyReports = dataToExport.filter(report => {
+        const parsed = parseTypologySpecificData(report.full_data?.typology_specific_data);
+        return parsed.selected_type === def.label;
       });
 
-      sheet.columns.forEach((column, index) => {
-        let maxLength = 14;
-        column.eachCell?.({ includeEmpty: true }, (cell) => {
-          const text = cell?.value?.toString() || '';
-          maxLength = Math.max(maxLength, text.length + 2);
-        });
-        column.width = index === 0 ? Math.max(16, Math.min(maxLength, 28)) : Math.min(maxLength, 42);
-      });
+      addTransposedSheet(def.sheetName, rows, typologyReports);
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -2214,248 +2263,226 @@ export default function BuildingForm() {
         </div>
       )}
 
-      {/* 5. USER FORM RENDERER (SECTIONED) */}
-      <div className="space-y-8">
-        {sections.map((section, secIdx) => (
-            <div key={section.id} className="space-y-4">
+      {/* 5. USER FORM RENDERER */}
+      <div className="space-y-6">
+        <div className="flex gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+          <button
+            onClick={() => setSurveyTab('general')}
+            className={`flex-1 px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${surveyTab === 'general' ? 'bg-[#001F3F] text-[#39CCCC]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+          >
+            General Survey
+          </button>
+          <button
+            onClick={() => setSurveyTab('typology')}
+            className={`flex-1 px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${surveyTab === 'typology' ? 'bg-[#85144B] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+          >
+            Building Typology
+          </button>
+        </div>
+
+        {surveyTab === 'general' && (
+          <div className="space-y-8">
+            {sections.map((section, secIdx) => (
+              <div key={section.id} className="space-y-4">
                 <div className="flex items-center gap-3 border-b-4 border-[#001F3F] pb-2">
-                    <Layers className="text-[#001F3F]" size={20} />
-                    <h2 className="text-sm font-black text-[#001F3F] uppercase tracking-widest">{section.title}</h2>
-                    {isAdmin && (
-                        <div className="ml-auto flex gap-2">
-                            <button onClick={() => moveSection(secIdx, 'up')} className="text-slate-400 hover:text-blue-500"><ArrowUp size={16}/></button>
-                            <button onClick={() => moveSection(secIdx, 'down')} className="text-slate-400 hover:text-blue-500"><ArrowDown size={16}/></button>
-                            <button onClick={() => renameSection(section.id)} className="text-blue-500 hover:text-blue-700"><PenTool size={16}/></button>
-                            <button onClick={() => removeSection(section.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
-                        </div>
-                    )}
+                  <Layers className="text-[#001F3F]" size={20} />
+                  <h2 className="text-sm font-black text-[#001F3F] uppercase tracking-widest">{section.title}</h2>
+                  {isAdmin && (
+                    <div className="ml-auto flex gap-2">
+                      <button onClick={() => moveSection(secIdx, 'up')} className="text-slate-400 hover:text-blue-500"><ArrowUp size={16}/></button>
+                      <button onClick={() => moveSection(secIdx, 'down')} className="text-slate-400 hover:text-blue-500"><ArrowDown size={16}/></button>
+                      <button onClick={() => renameSection(section.id)} className="text-blue-500 hover:text-blue-700"><PenTool size={16}/></button>
+                      <button onClick={() => removeSection(section.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
-                    {section.fields.map((f, fIdx) => (
-                        shouldShowField(f) && (
-                        <div key={f.id} className="bg-white p-4 sm:p-6 rounded-2xl border-2 border-slate-100 shadow-sm relative hover:border-blue-200 transition-colors">
-                            <div className="flex justify-between items-center mb-2">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111] flex items-center gap-1">
-                                      {f.label}
-                                      {f.dependsOn && <span title={`Conditional: ${getConditionDescription(f)}`} className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">⚡ Conditional</span>}
-                                      <Tooltip text={f.dependsOn ? `${f.tooltip}\n\n⚡ ${getConditionDescription(f)}` : f.tooltip} />
-                                      {f.required && <span className="text-red-500">*</span>}
-                                  </label>
-                                </div>
-                                {isAdmin && (
-                                    <div className="flex gap-2">
-                                        <button onClick={() => openFieldEditModal(f.id, section.id, f.type, f.options)} title="Edit Field" className="text-slate-300 hover:text-yellow-500"><PenTool size={14}/></button>
-                                        <button onClick={() => toggleFieldRequired(section.id, f.id)} title={f.required ? 'Remove Required' : 'Mark Required'} className={`transition-colors p-1 ${f.required ? 'text-red-500 bg-red-50 rounded' : 'text-slate-300 hover:text-orange-500'}`}><CheckSquare size={14}/></button>
-                                        <button onClick={() => toggleFieldAllowComments(section.id, f.id)} title={f.allowComments ? 'Disable Comments' : 'Allow Comments'} className={`transition-colors p-1 ${f.allowComments ? 'text-blue-500 bg-blue-50 rounded' : 'text-slate-300 hover:text-blue-500'}`}>💬</button>
-                                        <button onClick={() => moveField(section.id, fIdx, 'up')} className="text-slate-300 hover:text-blue-500"><ArrowUp size={14}/></button>
-                                        <button onClick={() => moveField(section.id, fIdx, 'down')} className="text-slate-300 hover:text-blue-500"><ArrowDown size={14}/></button>
-                                        <button onClick={() => removeField(section.id, f.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button>
-                                    </div>
-                                )}
+                  {section.fields.map((f, fIdx) => (
+                    shouldShowField(f) && (
+                      <div key={f.id} className="bg-white p-4 sm:p-6 rounded-2xl border-2 border-slate-100 shadow-sm relative hover:border-blue-200 transition-colors">
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111] flex items-center gap-1">
+                              {f.label}
+                              {f.dependsOn && <span title={`Conditional: ${getConditionDescription(f)}`} className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">⚡ Conditional</span>}
+                              <Tooltip text={f.dependsOn ? `${f.tooltip}\n\n⚡ ${getConditionDescription(f)}` : f.tooltip} />
+                              {f.required && <span className="text-red-500">*</span>}
+                            </label>
+                          </div>
+                          {isAdmin && (
+                            <div className="flex gap-2">
+                              <button onClick={() => openFieldEditModal(f.id, section.id, f.type, f.options)} title="Edit Field" className="text-slate-300 hover:text-yellow-500"><PenTool size={14}/></button>
+                              <button onClick={() => toggleFieldRequired(section.id, f.id)} title={f.required ? 'Remove Required' : 'Mark Required'} className={`transition-colors p-1 ${f.required ? 'text-red-500 bg-red-50 rounded' : 'text-slate-300 hover:text-orange-500'}`}><CheckSquare size={14}/></button>
+                              <button onClick={() => toggleFieldAllowComments(section.id, f.id)} title={f.allowComments ? 'Disable Comments' : 'Allow Comments'} className={`transition-colors p-1 ${f.allowComments ? 'text-blue-500 bg-blue-50 rounded' : 'text-slate-300 hover:text-blue-500'}`}>💬</button>
+                              <button onClick={() => moveField(section.id, fIdx, 'up')} className="text-slate-300 hover:text-blue-500"><ArrowUp size={14}/></button>
+                              <button onClick={() => moveField(section.id, fIdx, 'down')} className="text-slate-300 hover:text-blue-500"><ArrowDown size={14}/></button>
+                              <button onClick={() => removeField(section.id, f.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button>
                             </div>
-
-                            {f.type === 'text' && (
-                              f.autoDate ? (
-                                <input 
-                                  type="text" 
-                                  readOnly
-                                  className="w-full p-3 bg-slate-100 rounded-xl font-bold text-sm border-2 border-[#AAAAAA] text-[#111111] cursor-not-allowed"
-                                  value={formData[f.label] || (() => {
-                                    const today = new Date();
-                                    return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-                                  })()}
-                                />
-                              ) : (
-                                <input 
-                                  type="text" 
-                                  className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" 
-                                  placeholder="..." 
-                                  value={formData[f.label] || ''} 
-                                  onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} 
-                                />
-                              )
-                            )}
-                            {f.type === 'date' && (
-                              <input 
-                                type="date" 
-                                className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" 
-                                value={formData[f.label] || ''} 
-                                onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} 
-                              />
-                            )}
-                            {f.type === 'number' && <input type="number" className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" placeholder="0" value={formData[f.label] || ''} onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} />}
-                            
-                            {f.type === 'select' && (
-                                <div className="relative">
-                                    <select className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] appearance-none text-[#111111] outline-none" value={formData[f.label] || ''} onChange={(e) => setFormData({...formData, [f.label]: e.target.value})}>
-                                    <option value="">Select...</option>
-                                    {f.options?.map((o, i) => <option key={i} value={o}>{o}</option>)}
-                                    </select>
-                                    <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-[#AAAAAA]" size={20} />
-                                </div>
-                            )}
-
-                            {f.type === 'multi_select' && (
-                                <MultiSelect options={f.options || []} value={formData[f.label] || []} onChange={(val) => setFormData({...formData, [f.label]: val})} />
-                            )}
-
-                            {f.type === 'dynamic_series' && (
-                                <DynamicSeries value={formData[f.label] || []} onChange={(val) => setFormData({...formData, [f.label]: val})} darkModeProp={darkMode} />
-                            )}
-
-                            {f.type === 'group' && f.subFields && (
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                                    {f.subFields.map((sub, idx) => (
-                                        <div key={idx}>
-                                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">{sub.label}</p>
-                                            {sub.type === 'text' && <input type="text" className="w-full p-2 bg-white rounded-lg border border-slate-300 text-xs font-bold text-black" value={formData[`${f.label} [${sub.label}]`] || ''} onChange={(e) => setFormData({...formData, [`${f.label} [${sub.label}]`]: e.target.value})} />}
-                                            {sub.type === 'number' && <input type="number" className="w-full p-2 bg-white rounded-lg border border-slate-300 text-xs font-bold text-black" value={formData[`${f.label} [${sub.label}]`] || ''} onChange={(e) => setFormData({...formData, [`${f.label} [${sub.label}]`]: e.target.value})} />}
-                                            {sub.type === 'select' && (
-                                                <select className="w-full p-2 bg-white rounded-lg border border-slate-300 text-xs font-bold text-black" value={formData[`${f.label} [${sub.label}]`] || ''} onChange={(e) => setFormData({...formData, [`${f.label} [${sub.label}]`]: e.target.value})}>
-                                                    <option value="">Select...</option>
-                                                    {sub.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                                                </select>
-                                            )}
-                                            {sub.type === 'checkbox' && (
-                                                <input type="checkbox" className="w-5 h-5 accent-[#2ECC40]" checked={!!formData[`${f.label} [${sub.label}]`]} onChange={(e) => setFormData({...formData, [`${f.label} [${sub.label}]`]: e.target.checked})} />
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {f.type === 'image' && <ImageUpload label={f.label} value={formData[f.label] || []} onChange={(imgs) => setFormData({...formData, [f.label]: imgs})} />}
-                            
-                            {f.type === 'gps' && (
-                                <div className="flex gap-2">
-                                    <input type="text" readOnly className="flex-1 p-3 bg-slate-100 rounded-xl font-mono text-xs border-2 text-black" value={formData[f.label] || 'Waiting for signal...'} />
-                                    <button onClick={() => captureGPS(f.label)} className="bg-[#85144B] text-white p-3 rounded-xl hover:bg-[#600e35] flex items-center justify-center gap-2"><Loader2 className={locating ? "animate-spin" : "hidden"} size={18} /> <MapPin size={18} /></button>
-                                </div>
-                            )}
-                            
-                            {f.type === 'checkbox' && (
-                                <label className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl border-2 border-transparent hover:border-[#2ECC40] transition-all cursor-pointer">
-                                    <input type="checkbox" className="w-6 h-6 accent-[#2ECC40] rounded" checked={!!formData[f.label]} onChange={(e) => setFormData({...formData, [f.label]: e.target.checked})} />
-                                    <span className="text-xs font-bold uppercase text-[#111111]">Verified</span>
-                                </label>
-                            )}
-
-                            {f.allowComments && (
-                                <textarea placeholder="Add explanation or additional notes (optional)" className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#CCCCCC] focus:border-[#85144B] outline-none text-[#111111] min-h-24 resize-none" value={formData[`${f.label}_comment`] || ''} onChange={(e) => setFormData({...formData, [`${f.label}_comment`]: e.target.value})} />
-                            )}
-
-                            {/* Inline Field Edit Panel */}
-                            {editingFieldId === f.id && editingFieldSectionId === section.id && isAdmin && (
-                              <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border-2 border-blue-400 shadow-lg space-y-3">
-                                <div className="flex justify-between items-center mb-2">
-                                  <h3 className="text-xs font-black text-[#001F3F]">✏️ EDIT FIELD</h3>
-                                  <div className="flex items-center gap-2">
-                                    {fieldSaveStatus === 'saving' && <span className="text-[10px] font-bold text-blue-600 animate-pulse">💾 Saving...</span>}
-                                    {fieldSaveStatus === 'saved' && <span className="text-[10px] font-bold text-green-600">✅ Saved!</span>}
-                                    <button onClick={() => { setEditingFieldId(null); setEditingFieldSectionId(null); }} className="text-slate-400 hover:text-slate-600 transition" title="Close"><X size={16}/></button>
-                                  </div>
-                                </div>
-
-                                {/* Label Editor */}
-                                <div className="bg-white p-3 rounded-lg border border-blue-200 space-y-2">
-                                  <label className="text-[10px] font-bold text-slate-700">Update Label</label>
-                                  <div className="flex gap-2">
-                                    <input type="text" value={editingFieldNewLabel} onChange={(e) => setEditingFieldNewLabel(e.target.value)} className="flex-1 p-2 border-2 border-[#AAAAAA] rounded text-xs text-black focus:border-[#85144B] outline-none" />
-                                    <button onClick={async () => { if (!editingFieldNewLabel.trim()) { alert('Field label cannot be empty'); return; } setFieldSaveStatus('saving'); await editFieldLabel(editingFieldSectionId, editingFieldId, editingFieldNewLabel); setFieldSaveStatus('saved'); setTimeout(() => setFieldSaveStatus('idle'), 2000); }} className="bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded hover:bg-blue-700 transition whitespace-nowrap">Save</button>
-                                  </div>
-                                </div>
-
-                                {/* Type Selector */}
-                                <div className="grid grid-cols-5 gap-1">
-                                  {(['text', 'date', 'number', 'select', 'multi_select', 'checkbox', 'image', 'gps', 'group', 'dynamic_series'] as FieldType[]).map(type => (
-                                    <button key={type} onClick={async () => { setFieldSaveStatus('saving'); setEditFieldType(type); await updateFieldTypeAsync(editingFieldSectionId, editingFieldId, type); setFieldSaveStatus('saved'); setTimeout(() => setFieldSaveStatus('idle'), 2000); }} className={`p-2 rounded text-[10px] font-bold border-2 transition-all ${editFieldType === type ? 'border-[#001F3F] bg-[#001F3F] text-white' : 'border-[#AAAAAA] bg-white text-[#001F3F] hover:border-[#001F3F]'}`} title={getFieldTypeLabel(type)}>{getFieldTypeIcon(type)}</button>
-                                  ))}
-                                </div>
-
-                                {/* Options for Dropdown Fields */}
-                                {(editFieldType === 'select' || editFieldType === 'multi_select') && (
-                                  <div className="bg-white p-3 rounded-lg border border-blue-200 space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-700">Options</label>
-                                    <textarea value={editFieldOptions.join(', ')} onChange={(e) => { const text = e.target.value; const parsed = text.split(',').map(o => o.trim()).filter(o => o !== ''); setEditFieldOptions(parsed); }} placeholder="Red, Blue, Green" className="w-full p-2 border-2 border-[#AAAAAA] rounded text-xs text-black resize-none h-14 focus:border-[#85144B] outline-none" />
-                                    <div className="flex flex-wrap gap-1">{editFieldOptions.map((opt, i) => <span key={i} className="bg-[#001F3F] text-white px-2 py-0.5 rounded text-[9px]">{opt}</span>)}</div>
-                                    <button onClick={async () => { if (editFieldOptions.length === 0) { alert('Add at least one option'); return; } await updateFieldOptions(editingFieldSectionId, editingFieldId, editFieldOptions); alert('✅ Options saved!'); }} className="w-full bg-[#85144B] text-white font-bold py-1 rounded text-xs hover:bg-[#6B0B3A] transition">Save Options</button>
-                                  </div>
-                                )}
-
-                                {/* Stats */}
-                                <div className="bg-white p-2 rounded text-[9px] text-slate-700 font-bold text-center border border-blue-200">📊 Used in {countFieldUsage(editingFieldId)} reports</div>
-                              </div>
-                            )}
+                          )}
                         </div>
-                        )
-                    ))}
-                </div>
-            </div>
-        ))}
 
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 border-b-4 border-[#001F3F] pb-2">
-            <Layers className="text-[#001F3F]" size={20} />
-            <h2 className="text-sm font-black text-[#001F3F] uppercase tracking-widest">Building Typology</h2>
-          </div>
+                        {f.type === 'text' && (
+                          f.autoDate ? (
+                            <input 
+                              type="text" 
+                              readOnly
+                              className="w-full p-3 bg-slate-100 rounded-xl font-bold text-sm border-2 border-[#AAAAAA] text-[#111111] cursor-not-allowed"
+                              value={formData[f.label] || (() => {
+                                const today = new Date();
+                                return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+                              })()}
+                            />
+                          ) : (
+                            <input 
+                              type="text" 
+                              className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" 
+                              placeholder="..." 
+                              value={formData[f.label] || ''} 
+                              onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} 
+                            />
+                          )
+                        )}
+                        {f.type === 'date' && (
+                          <input 
+                            type="date" 
+                            className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" 
+                            value={formData[f.label] || ''} 
+                            onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} 
+                          />
+                        )}
+                        {f.type === 'number' && <input type="number" className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]" placeholder="0" value={formData[f.label] || ''} onChange={(e) => setFormData({...formData, [f.label]: e.target.value})} />}
+                        
+                        {f.type === 'select' && (
+                          <div className="relative">
+                            <select className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] appearance-none text-[#111111] outline-none" value={formData[f.label] || ''} onChange={(e) => setFormData({...formData, [f.label]: e.target.value})}>
+                              <option value="">Select...</option>
+                              {f.options?.map((o, i) => <option key={i} value={o}>{o}</option>)}
+                            </select>
+                            <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-[#AAAAAA]" size={20} />
+                          </div>
+                        )}
 
-          <div className="bg-white p-4 sm:p-6 rounded-2xl border-2 border-slate-100 shadow-sm relative hover:border-blue-200 transition-colors">
-            <div className="mb-3">
-              <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">Typology Selection</label>
-              <div className="relative mt-2">
-                <select
-                  className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] appearance-none text-[#111111] outline-none"
-                  value={currentTypologyData.selected_type || ''}
-                  onChange={(e) => updateTypologySelectedType(e.target.value)}
-                >
-                  <option value="">Select...</option>
-                  {TYPOLOGY_DEFINITIONS.map(def => (
-                    <option key={def.label} value={def.label}>{def.label}</option>
-                  ))}
-                </select>
-                <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-[#AAAAAA]" size={20} />
-              </div>
-            </div>
+                        {f.type === 'multi_select' && (
+                          <MultiSelect options={f.options || []} value={formData[f.label] || []} onChange={(val) => setFormData({...formData, [f.label]: val})} />
+                        )}
 
-            {selectedTypologyDefinition && (
-              <div className="grid grid-cols-1 gap-4">
-                {selectedTypologyDefinition.fields.map(field => {
-                  if (!isTypologyFieldVisible(field, currentTypologyData.responses || {})) return null;
-                  return (
-                  <div key={field.id}>
-                    <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">{field.label}</label>
-                    {field.type === 'select' ? (
-                      <div className="relative mt-1">
-                        <select
-                          className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] appearance-none text-[#111111] outline-none"
-                          value={currentTypologyData.responses?.[field.id] || ''}
-                          onChange={(e) => updateTypologyResponse(field.id, e.target.value)}
-                        >
-                          <option value="">Select...</option>
-                          {(field.options || []).map(option => (
-                            <option key={option} value={option}>{option}</option>
-                          ))}
-                        </select>
-                        <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-[#AAAAAA]" size={20} />
+                        {f.type === 'dynamic_series' && (
+                          <DynamicSeries value={formData[f.label] || []} onChange={(val) => setFormData({...formData, [f.label]: val})} darkModeProp={darkMode} />
+                        )}
+
+                        {f.type === 'group' && f.subFields && (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                            {f.subFields.map((sub, idx) => (
+                              <div key={idx}>
+                                <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">{sub.label}</p>
+                                {sub.type === 'text' && <input type="text" className="w-full p-2 bg-white rounded-lg border border-slate-300 text-xs font-bold text-black" value={formData[`${f.label} [${sub.label}]`] || ''} onChange={(e) => setFormData({...formData, [`${f.label} [${sub.label}]`]: e.target.value})} />}
+                                {sub.type === 'number' && <input type="number" className="w-full p-2 bg-white rounded-lg border border-slate-300 text-xs font-bold text-black" value={formData[`${f.label} [${sub.label}]`] || ''} onChange={(e) => setFormData({...formData, [`${f.label} [${sub.label}]`]: e.target.value})} />}
+                                {sub.type === 'select' && (
+                                  <select className="w-full p-2 bg-white rounded-lg border border-slate-300 text-xs font-bold text-black" value={formData[`${f.label} [${sub.label}]`] || ''} onChange={(e) => setFormData({...formData, [`${f.label} [${sub.label}]`]: e.target.value})}>
+                                    <option value="">Select...</option>
+                                    {sub.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                                  </select>
+                                )}
+                                {sub.type === 'checkbox' && (
+                                  <input type="checkbox" className="w-5 h-5 accent-[#2ECC40]" checked={!!formData[`${f.label} [${sub.label}]`]} onChange={(e) => setFormData({...formData, [`${f.label} [${sub.label}]`]: e.target.checked})} />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {f.type === 'image' && <ImageUpload label={f.label} value={formData[f.label] || []} onChange={(imgs) => setFormData({...formData, [f.label]: imgs})} />}
+                        
+                        {f.type === 'gps' && (
+                          <div className="flex gap-2">
+                            <input type="text" readOnly className="flex-1 p-3 bg-slate-100 rounded-xl font-mono text-xs border-2 text-black" value={formData[f.label] || 'Waiting for signal...'} />
+                            <button onClick={() => captureGPS(f.label)} className="bg-[#85144B] text-white p-3 rounded-xl hover:bg-[#600e35] flex items-center justify-center gap-2"><Loader2 className={locating ? "animate-spin" : "hidden"} size={18} /> <MapPin size={18} /></button>
+                          </div>
+                        )}
+                        
+                        {f.type === 'checkbox' && (
+                          <label className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl border-2 border-transparent hover:border-[#2ECC40] transition-all cursor-pointer">
+                            <input type="checkbox" className="w-6 h-6 accent-[#2ECC40] rounded" checked={!!formData[f.label]} onChange={(e) => setFormData({...formData, [f.label]: e.target.checked})} />
+                            <span className="text-xs font-bold uppercase text-[#111111]">Verified</span>
+                          </label>
+                        )}
+
+                        {f.allowComments && (
+                          <textarea placeholder="Add explanation or additional notes (optional)" className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#CCCCCC] focus:border-[#85144B] outline-none text-[#111111] min-h-24 resize-none" value={formData[`${f.label}_comment`] || ''} onChange={(e) => setFormData({...formData, [`${f.label}_comment`]: e.target.value})} />
+                        )}
                       </div>
-                    ) : (
-                      <input
-                        type={field.type === 'number' ? 'number' : 'text'}
-                        className="w-full mt-1 p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]"
-                        placeholder="..."
-                        value={currentTypologyData.responses?.[field.id] || ''}
-                        onChange={(e) => updateTypologyResponse(field.id, e.target.value)}
-                      />
-                    )}
-                  </div>
-                  );
-                })}
+                    )
+                  ))}
+                </div>
               </div>
-            )}
+            ))}
           </div>
-        </div>
+        )}
+
+        {surveyTab === 'typology' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 border-b-4 border-[#001F3F] pb-2">
+              <Layers className="text-[#001F3F]" size={20} />
+              <h2 className="text-sm font-black text-[#001F3F] uppercase tracking-widest">Building Typology</h2>
+            </div>
+
+            <div className="bg-white p-4 sm:p-6 rounded-2xl border-2 border-slate-100 shadow-sm relative hover:border-blue-200 transition-colors">
+              <div className="mb-3">
+                <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">Typology Selection</label>
+                <div className="relative mt-2">
+                  <select
+                    className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] appearance-none text-[#111111] outline-none"
+                    value={currentTypologyData.selected_type || ''}
+                    onChange={(e) => updateTypologySelectedType(e.target.value)}
+                  >
+                    <option value="">Select...</option>
+                    {TYPOLOGY_DEFINITIONS.map(def => (
+                      <option key={def.label} value={def.label}>{def.label}</option>
+                    ))}
+                  </select>
+                  <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-[#AAAAAA]" size={20} />
+                </div>
+              </div>
+
+              {selectedTypologyDefinition && (
+                <div className="grid grid-cols-1 gap-4">
+                  {selectedTypologyDefinition.fields.map(field => {
+                    if (!isTypologyFieldVisible(field, currentTypologyData.responses || {})) return null;
+                    return (
+                      <div key={field.id}>
+                        <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">{field.label}</label>
+                        {field.type === 'select' ? (
+                          <div className="relative mt-1">
+                            <select
+                              className="w-full p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] appearance-none text-[#111111] outline-none"
+                              value={currentTypologyData.responses?.[field.id] || ''}
+                              onChange={(e) => updateTypologyResponse(field.id, e.target.value)}
+                            >
+                              <option value="">Select...</option>
+                              {(field.options || []).map(option => (
+                                <option key={option} value={option}>{option}</option>
+                              ))}
+                            </select>
+                            <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-[#AAAAAA]" size={20} />
+                          </div>
+                        ) : (
+                          <input
+                            type={field.type === 'number' ? 'number' : 'text'}
+                            className="w-full mt-1 p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]"
+                            placeholder="..."
+                            value={currentTypologyData.responses?.[field.id] || ''}
+                            onChange={(e) => updateTypologyResponse(field.id, e.target.value)}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {!isAdmin && (
