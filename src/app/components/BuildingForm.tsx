@@ -173,7 +173,7 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'external_wall_thickness_specific', label: 'External Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'external_wall_thickness_category', equals: 'specific thickness' } },
       { id: 'internal_wall_thickness_category', label: 'Internal Wall Thickness', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
       { id: 'internal_wall_thickness_specific', label: 'Internal Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'internal_wall_thickness_category', equals: 'specific thickness' } },
-      { id: 'spacing_between_timber_laces', label: 'Spacing between timber laces', type: 'number' },
+      { id: 'spacing_between_timber_laces', label: 'Spacing Between Timber Laces (ft)', type: 'number' },
       { id: 'size_of_timber_laces', label: 'Size of timber laces', type: 'number' },
       { id: 'longitudinal_cross_connection', label: 'Connection between longitudinal timber laces and cross members', type: 'select', options: ['nailed', 'half connection'] },
       { id: 'spacing_of_cross_members', label: 'Spacing of cross members', type: 'number' },
