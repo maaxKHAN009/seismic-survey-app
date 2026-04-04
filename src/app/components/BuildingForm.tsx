@@ -94,6 +94,7 @@ interface TypologyField {
   displayWhen?: {
     fieldId: string;
     equals: string;
+    equalsAny?: string[];
   };
 }
 
@@ -119,11 +120,11 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
     sheetName: 'UR Stone Masonry',
     fields: [
       { id: 'no_of_storey', label: 'No. of storey', type: 'select', options: ['single storey', 'double storey'] },
-      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number' },
-      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number' },
+      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'single storey', equalsAny: ['single storey', 'double storey'] } },
+      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'double storey' } },
       { id: 'type_of_stone', label: 'Type of stone', type: 'select', options: ['Semi-dressed stone', 'round river-bed stone', 'foliated slate stone'] },
       { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
-      { id: 'construction_material_distance', label: 'Construction material distance', type: 'text' },
+      { id: 'construction_material_distance', label: 'Construction material distance(km)', type: 'text' },
       { id: 'maximum_stone_size', label: 'Maximum stone size', type: 'select', options: ['>12"', '9"-12"', '6"-9"', '<6"', 'other size'] },
       { id: 'maximum_stone_size_other', label: 'Maximum stone size (other)', type: 'number', displayWhen: { fieldId: 'maximum_stone_size', equals: 'other size' } },
       { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Dry/No mortar', 'Mud mortar', 'Cement-sand mortar'] },
@@ -160,11 +161,11 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
     sheetName: 'Stone Masonry Timber',
     fields: [
       { id: 'no_of_storey', label: 'No. of storey', type: 'select', options: ['single storey', 'double storey'] },
-      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number' },
-      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number' },
+      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'single storey', equalsAny: ['single storey', 'double storey'] } },
+      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'double storey' } },
       { id: 'type_of_stone', label: 'Type of stone', type: 'select', options: ['Semi-dressed stone', 'round river-bed stone', 'foliated slate stone'] },
       { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
-      { id: 'construction_material_distance', label: 'Construction material distance', type: 'number' },
+      { id: 'construction_material_distance', label: 'Construction material distance(km)', type: 'number' },
       { id: 'maximum_stone_size', label: 'Maximum stone size', type: 'select', options: ['>12"', '9"-12"', '6"-9"', '<6"', 'other size'] },
       { id: 'maximum_stone_size_other', label: 'Maximum stone size (other)', type: 'number', displayWhen: { fieldId: 'maximum_stone_size', equals: 'other size' } },
       { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Dry/No mortar', 'Mud mortar', 'Cement-sand mortar'] },
@@ -200,11 +201,11 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
     sheetName: 'RC Confined Stone',
     fields: [
       { id: 'no_of_storey', label: 'No. of storey', type: 'select', options: ['single storey', 'double storey'] },
-      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number' },
-      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number' },
+      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'single storey', equalsAny: ['single storey', 'double storey'] } },
+      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'double storey' } },
       { id: 'type_of_stone', label: 'Type of stone', type: 'select', options: ['Semi-dressed quarry stone', 'round river-bed stone', 'foliated slate stone'] },
       { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
-      { id: 'construction_material_distance', label: 'Construction material distance', type: 'number' },
+      { id: 'construction_material_distance', label: 'Construction material distance(km)', type: 'number' },
       { id: 'maximum_stone_size', label: 'Maximum stone size', type: 'select', options: ['>12"', '9"-12"', '6"-9"', '<6"', 'other size'] },
       { id: 'maximum_stone_size_other', label: 'Maximum stone size (other)', type: 'number', displayWhen: { fieldId: 'maximum_stone_size', equals: 'other size' } },
       { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Dry/No mortar', 'Mud mortar', 'Cement-sand mortar'] },
@@ -251,14 +252,14 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
     sheetName: 'UR Block Adobe',
     fields: [
       { id: 'no_of_storey', label: 'No. of storey', type: 'select', options: ['single storey', 'double storey'] },
-      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number' },
-      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number' },
+      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'single storey', equalsAny: ['single storey', 'double storey'] } },
+      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'double storey' } },
       { id: 'type_of_block', label: 'Type of block', type: 'select', options: ['Concrete solid block', 'Concrete hollow block', 'adobe solid block'] },
       { id: 'size_of_block_width', label: 'Size of block - width', type: 'number' },
       { id: 'size_of_block_depth', label: 'Size of block - depth', type: 'number' },
       { id: 'size_of_block_height', label: 'Size of block - height', type: 'number' },
       { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
-      { id: 'construction_material_distance', label: 'Construction material distance', type: 'number' },
+      { id: 'construction_material_distance', label: 'Construction material distance(km)', type: 'number' },
       { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Mud mortar', 'Cement-sand mortar'] },
       { id: 'orthogonal_wall_connection', label: 'Connection between orthogonal walls', type: 'select', options: ['adequate with proper overlap', 'not adequate connection'] },
       { id: 'wall_thickness', label: 'Wall Thickness', type: 'number' },
@@ -288,14 +289,14 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
     sheetName: 'RC Confined Block Adobe',
     fields: [
       { id: 'no_of_storey', label: 'No. of storey', type: 'select', options: ['single storey', 'double storey'] },
-      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number' },
-      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number' },
+      { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'single storey', equalsAny: ['single storey', 'double storey'] } },
+      { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'double storey' } },
       { id: 'type_of_block', label: 'Type of block', type: 'select', options: ['Concrete solid block', 'Concrete hollow block', 'adobe solid block'] },
       { id: 'size_of_block_width', label: 'Size of block - width', type: 'number' },
       { id: 'size_of_block_depth', label: 'Size of block - depth', type: 'number' },
       { id: 'size_of_block_height', label: 'Size of block - height', type: 'number' },
       { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
-      { id: 'construction_material_distance', label: 'Construction material distance', type: 'number' },
+      { id: 'construction_material_distance', label: 'Construction material distance(km)', type: 'number' },
       { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Dry/No mortar', 'Mud mortar', 'Cement-sand mortar'] },
       { id: 'wall_thickness', label: 'Wall Thickness', type: 'number' },
       { id: 'window_size_length', label: 'Typical size of window - Length', type: 'number' },
@@ -699,7 +700,11 @@ export default function BuildingForm() {
 
   const isTypologyFieldVisible = (field: TypologyField, responses: Record<string, any>): boolean => {
     if (!field.displayWhen) return true;
-    return responses?.[field.displayWhen.fieldId] === field.displayWhen.equals;
+    const parentValue = responses?.[field.displayWhen.fieldId];
+    if (field.displayWhen.equalsAny && field.displayWhen.equalsAny.length > 0) {
+      return field.displayWhen.equalsAny.includes(parentValue);
+    }
+    return parentValue === field.displayWhen.equals;
   };
 
   const countFieldUsage = (fieldId: string): number => {
@@ -1514,7 +1519,7 @@ export default function BuildingForm() {
           activeSection = row.section;
           const startSectionRow = rowIndex;
           const endSectionRow = rowIndex + 2;
-          sheet.mergeCells(startSectionRow, 1, endSectionRow, lastCol);
+          sheet.mergeCells(startSectionRow, 1, endSectionRow, 1);
           const sectionCell = sheet.getCell(startSectionRow, 1);
           sectionCell.value = activeSection;
           sectionCell.font = { bold: true, color: { argb: 'FF111111' }, size: 12 };
