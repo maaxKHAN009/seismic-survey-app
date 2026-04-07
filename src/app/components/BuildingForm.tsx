@@ -2721,9 +2721,9 @@ export default function BuildingForm() {
                       return (
                         <div key={group.id}>
                           <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">{group.label}</label>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                          <div className={`grid gap-3 mt-1 ${visibleMemberFields.length === 3 ? 'grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
                             {visibleMemberFields.map(memberField => (
-                              <div key={memberField.id}>
+                              <div key={memberField.id} className="min-w-0">
                                 <label className="text-[10px] font-black uppercase text-[#111111]">
                                   {group.subLabels[memberField.id] || memberField.label}
                                 </label>
