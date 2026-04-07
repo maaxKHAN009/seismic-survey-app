@@ -1883,6 +1883,43 @@ export default function BuildingForm() {
     await updateSchema(updatedSections);
   };
 
+  const saveFieldEditsAtomic = async (sectionId: string, fieldId: string, newLabel: string, newType: FieldType, newOptions: string[]) => {
+    const label = newLabel.trim();
+    if (!label) return;
+
+    const normalizedOptions = newOptions.map(opt => opt.trim()).filter(Boolean);
+    const updatedSections = sections.map(sec => {
+      if (sec.id !== sectionId) return sec;
+
+      return {
+        ...sec,
+        fields: sec.fields.map(f => {
+          if (f.id !== fieldId) return f;
+
+          const updated: CustomField = {
+            ...f,
+            label,
+            type: newType
+          };
+
+          if (newType === 'select' || newType === 'multi_select') {
+            updated.options = normalizedOptions;
+          } else {
+            updated.options = undefined;
+          }
+
+          if (newType !== 'group') {
+            updated.subFields = undefined;
+          }
+
+          return updated;
+        })
+      };
+    });
+
+    await updateSchema(updatedSections);
+  };
+
   const moveFieldBetweenSections = async (fromSectionId: string, toSectionId: string, fieldIndex: number) => {
     const fromSection = sections.find(s => s.id === fromSectionId);
     if (!fromSection || fieldIndex < 0 || fieldIndex >= fromSection.fields.length) return;
@@ -2476,13 +2513,12 @@ export default function BuildingForm() {
                                 type="button"
                                 onClick={async () => {
                                   if (!editingFieldSectionId || !editingFieldId) return;
-                                  setFieldSaveStatus('saving');
-                                  await editFieldLabel(editingFieldSectionId, editingFieldId, editingFieldNewLabel);
-                                  await updateFieldTypeAsync(editingFieldSectionId, editingFieldId, editFieldType);
-                                  if (editFieldType === 'select' || editFieldType === 'multi_select') {
-                                    const normalizedOptions = editFieldOptions.map(opt => opt.trim()).filter(Boolean);
-                                    await updateFieldOptions(editingFieldSectionId, editingFieldId, normalizedOptions);
+                                  if (!editingFieldNewLabel.trim()) {
+                                    alert('Question label cannot be empty.');
+                                    return;
                                   }
+                                  setFieldSaveStatus('saving');
+                                  await saveFieldEditsAtomic(editingFieldSectionId, editingFieldId, editingFieldNewLabel, editFieldType, editFieldOptions);
                                   setFieldSaveStatus('saved');
                                   setTimeout(() => {
                                     setEditingFieldId(null);
