@@ -627,6 +627,8 @@ export default function BuildingForm() {
   const [viewingImages, setViewingImages] = useState<ImageObject[] | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
+  const [dataRecordsPage, setDataRecordsPage] = useState(1);
+  const DATA_RECORDS_PER_PAGE = 5;
 
   const [newSectionTitle, setNewSectionTitle] = useState('');
   const [targetSectionId, setTargetSectionId] = useState('');
@@ -1008,6 +1010,11 @@ export default function BuildingForm() {
   useEffect(() => {
     detectCircularDependencies();
   }, [sections]);
+
+  // Keep Data Records pagination stable and reset when filters/data change
+  useEffect(() => {
+    setDataRecordsPage(1);
+  }, [searchQuery, filterDateFrom, filterDateTo, filterStatus, reports.length]);
 
   // NEW: Keyboard shortcuts
   useEffect(() => {
@@ -1939,6 +1946,13 @@ export default function BuildingForm() {
 
   const filteredReports = reports.filter(r => r.building_id.toLowerCase().includes(searchQuery.toLowerCase()));
   const paginatedReports = filteredReports.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const filteredDataRecords = getFilteredReports();
+  const totalDataRecordsPages = Math.max(1, Math.ceil(filteredDataRecords.length / DATA_RECORDS_PER_PAGE));
+  const safeDataRecordsPage = Math.min(dataRecordsPage, totalDataRecordsPages);
+  const paginatedDataRecords = filteredDataRecords.slice(
+    (safeDataRecordsPage - 1) * DATA_RECORDS_PER_PAGE,
+    safeDataRecordsPage * DATA_RECORDS_PER_PAGE
+  );
 
   const shouldShowField = (field: CustomField): boolean => {
     if (!field.dependsOn) return true;
@@ -2024,7 +2038,7 @@ export default function BuildingForm() {
           {/* Data Records Panel */}
           <div className="bg-white p-6 rounded-3xl border-2 border-[#001F3F] shadow-xl space-y-4">
              <div className="flex justify-between items-center border-b pb-3">
-                 <h3 className="font-black text-[#001F3F] text-xs">📊 DATA RECORDS ({getFilteredReports().length})</h3>
+                 <h3 className="font-black text-[#001F3F] text-xs">📊 DATA RECORDS ({filteredDataRecords.length})</h3>
                  <div className="flex gap-2">
                    {batchSelectedReports.size > 0 && (
                      <>
@@ -2051,8 +2065,8 @@ export default function BuildingForm() {
                </div>
              </div>
 
-             <div className="max-h-96 overflow-y-auto">
-                 {getFilteredReports().length === 0 ? <p className="text-xs text-slate-500 p-4">No records found</p> : getFilteredReports().map(r => {
+             <div className="h-[270px] overflow-hidden border border-slate-100 rounded-lg bg-white">
+                 {filteredDataRecords.length === 0 ? <p className="text-xs text-slate-500 p-4">No records found</p> : paginatedDataRecords.map(r => {
                    return (
                      <div key={r.id} className="flex justify-between items-center p-3 border-b text-xs">
                          <div className="flex-1">
@@ -2070,6 +2084,32 @@ export default function BuildingForm() {
                    );
                  })}
              </div>
+
+             {filteredDataRecords.length > 0 && (
+               <div className="flex items-center justify-between mt-3">
+                 <span className="text-[10px] font-bold text-slate-600">
+                   Page {safeDataRecordsPage} of {totalDataRecordsPages}
+                 </span>
+                 <div className="flex gap-2">
+                   <button
+                     type="button"
+                     disabled={safeDataRecordsPage <= 1}
+                     onClick={() => setDataRecordsPage(prev => Math.max(1, prev - 1))}
+                     className="px-3 py-1 rounded text-[10px] font-black bg-slate-100 text-slate-700 disabled:opacity-40"
+                   >
+                     Prev
+                   </button>
+                   <button
+                     type="button"
+                     disabled={safeDataRecordsPage >= totalDataRecordsPages}
+                     onClick={() => setDataRecordsPage(prev => Math.min(totalDataRecordsPages, prev + 1))}
+                     className="px-3 py-1 rounded text-[10px] font-black bg-slate-100 text-slate-700 disabled:opacity-40"
+                   >
+                     Next
+                   </button>
+                 </div>
+               </div>
+             )}
           </div>
 
           {/* Audit Log Modal */}
