@@ -104,6 +104,13 @@ interface TypologyDefinition {
   fields: TypologyField[];
 }
 
+interface TypologyFieldGroup {
+  id: string;
+  label: string;
+  fieldIds: string[];
+  subLabels: Record<string, string>;
+}
+
 interface TypologySpecificData {
   selected_type: string;
   responses: Record<string, any>;
@@ -113,6 +120,71 @@ const FLOOR_OPTIONS = ['RC Slab', 'timber flat roof', 'T-iron roof', 'Not applic
 const ROOF_OPTIONS = ['RC Slab', 'timber flat roof', 'T-iron roof', 'wooden truss', 'steel truss', 'other'];
 const FLOOR_CONNECTION_OPTIONS = ['No connection/bearing', 'connection through wooden laces', 'other'];
 const ROOF_CONNECTION_OPTIONS = ['No connection/bearing', 'connection through wooden laces', 'steel anchor bolts', 'other'];
+
+const TYPOLOGY_FIELD_GROUPS: TypologyFieldGroup[] = [
+  {
+    id: 'window_size_group',
+    label: 'Typical size of window (ft)',
+    fieldIds: ['window_size_length', 'window_size_height'],
+    subLabels: {
+      window_size_length: 'Width',
+      window_size_height: 'Height'
+    }
+  },
+  {
+    id: 'door_size_group',
+    label: 'Typical size of door (ft)',
+    fieldIds: ['door_size_length', 'door_size_height'],
+    subLabels: {
+      door_size_length: 'Width',
+      door_size_height: 'Height'
+    }
+  },
+  {
+    id: 'verandah_column_group',
+    label: 'Verandah column size (in)',
+    fieldIds: ['verandah_column_width', 'verandah_column_depth'],
+    subLabels: {
+      verandah_column_width: 'Width',
+      verandah_column_depth: 'Depth'
+    }
+  },
+  {
+    id: 'block_size_group',
+    label: 'Size of block (in)',
+    fieldIds: ['size_of_block_width', 'size_of_block_depth', 'size_of_block_height'],
+    subLabels: {
+      size_of_block_width: 'Length',
+      size_of_block_depth: 'Width',
+      size_of_block_height: 'Height'
+    }
+  },
+  {
+    id: 'vertical_confining_group',
+    label: 'Vertical confining element/column size (in)',
+    fieldIds: ['vertical_confining_width', 'vertical_confining_depth'],
+    subLabels: {
+      vertical_confining_width: 'Width',
+      vertical_confining_depth: 'Depth'
+    }
+  },
+  {
+    id: 'vertical_opening_group',
+    label: 'Vertical confining elements at openings size (in)',
+    fieldIds: ['vertical_opening_elements_width', 'vertical_opening_elements_depth'],
+    subLabels: {
+      vertical_opening_elements_width: 'Width',
+      vertical_opening_elements_depth: 'Depth'
+    }
+  }
+];
+
+const TYPOLOGY_FIELD_GROUP_BY_ID: Record<string, TypologyFieldGroup> = TYPOLOGY_FIELD_GROUPS.reduce((acc, group) => {
+  group.fieldIds.forEach(fieldId => {
+    acc[fieldId] = group;
+  });
+  return acc;
+}, {} as Record<string, TypologyFieldGroup>);
 
 const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
   {
@@ -124,28 +196,28 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'double storey' } },
       { id: 'type_of_stone', label: 'Type of stone', type: 'select', options: ['Semi-dressed stone', 'round river-bed stone', 'foliated slate stone'] },
       { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
-      { id: 'construction_material_distance', label: 'Construction material distance(km)', type: 'text' },
+      { id: 'construction_material_distance', label: 'Construction material distance(km)', type: 'number' },
       { id: 'maximum_stone_size', label: 'Maximum stone size', type: 'select', options: ['>12"', '9"-12"', '6"-9"', '<6"', 'other size'] },
       { id: 'maximum_stone_size_other', label: 'Maximum stone size (other)', type: 'number', displayWhen: { fieldId: 'maximum_stone_size', equals: 'other size' } },
       { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Dry/No mortar', 'Mud mortar', 'Cement-sand mortar'] },
       { id: 'through_stone_provision', label: 'Through stone', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'through_stone_spacing', label: 'Through stone typical spacing', type: 'text', displayWhen: { fieldId: 'through_stone_provision', equals: 'Provided' } },
+      { id: 'through_stone_spacing', label: 'Through stone typical spacing', type: 'number', displayWhen: { fieldId: 'through_stone_provision', equals: 'Provided' } },
       { id: 'orthogonal_wall_connection', label: 'Connection between orthogonal walls', type: 'select', options: ['through stone provided', 'not adequate connection'] },
       { id: 'external_wall_thickness_category', label: 'External Wall Thickness', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
       { id: 'external_wall_thickness_specific', label: 'External Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'external_wall_thickness_category', equals: 'specific thickness' } },
       { id: 'internal_wall_thickness_category', label: 'Internal Wall Thickness', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
       { id: 'internal_wall_thickness_specific', label: 'Internal Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'internal_wall_thickness_category', equals: 'specific thickness' } },
-      { id: 'window_size_length', label: 'Typical size of window - Length', type: 'number' },
-      { id: 'window_size_height', label: 'Typical size of window - Height', type: 'number' },
-      { id: 'door_size_length', label: 'Typical size of door - Length', type: 'number' },
-      { id: 'door_size_height', label: 'Typical size of door - Height', type: 'number' },
+      { id: 'window_size_length', label: 'Typical size of window - Length (ft)', type: 'number' },
+      { id: 'window_size_height', label: 'Typical size of window - Height (ft)', type: 'number' },
+      { id: 'door_size_length', label: 'Typical size of door - Length (ft)', type: 'number' },
+      { id: 'door_size_height', label: 'Typical size of door - Height (ft)', type: 'number' },
       { id: 'lintel_beam_type', label: 'Type of lintel beam', type: 'select', options: ['Continuous on all opening', 'separate on each opening'] },
       { id: 'opening_alignment_vertical', label: 'Opening alignment in vertical direction', type: 'select', options: ['Aligned', 'Not aligned'] },
       { id: 'lintel_beam_material', label: 'Material of lintel beam', type: 'select', options: ['wooden beam', 'stone beam', 'RC beam', 'other'] },
       { id: 'lintel_beam_material_other', label: 'Material of lintel beam - other', type: 'text', displayWhen: { fieldId: 'lintel_beam_material', equals: 'other' } },
       { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'Stone masonry column'] },
-      { id: 'verandah_column_width', label: 'Verandah column size - width', type: 'number' },
-      { id: 'verandah_column_depth', label: 'Verandah column size - depth', type: 'number' },
+      { id: 'verandah_column_width', label: 'Verandah column size - Width (in)', type: 'number' },
+      { id: 'verandah_column_depth', label: 'Verandah column size - Depth (in)', type: 'number' },
       { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
       { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
       { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
@@ -178,14 +250,14 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'longitudinal_cross_connection', label: 'Connection between longitudinal timber laces and cross members', type: 'select', options: ['nailed', 'half connection'] },
       { id: 'spacing_of_cross_members', label: 'Spacing of cross members', type: 'number' },
       { id: 'corner_timber_connection', label: 'Connection between timber laces at wall corner', type: 'select', options: ['No connection', 'Nailed', 'Half connection with projection', 'half connection without projection'] },
-      { id: 'window_size_length', label: 'Typical size of window - Length', type: 'number' },
-      { id: 'window_size_height', label: 'Typical size of window - Height', type: 'number' },
-      { id: 'door_size_length', label: 'Typical size of door - Length', type: 'number' },
-      { id: 'door_size_height', label: 'Typical size of door - Height', type: 'number' },
+      { id: 'window_size_length', label: 'Typical size of window - Length (ft)', type: 'number' },
+      { id: 'window_size_height', label: 'Typical size of window - Height (ft)', type: 'number' },
+      { id: 'door_size_length', label: 'Typical size of door - Length (ft)', type: 'number' },
+      { id: 'door_size_height', label: 'Typical size of door - Height (ft)', type: 'number' },
       { id: 'opening_alignment_vertical', label: 'Opening alignment in vertical direction', type: 'select', options: ['Aligned', 'Not aligned'] },
       { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'Stone masonry column'] },
-      { id: 'verandah_column_width', label: 'Verandah column size - width', type: 'number' },
-      { id: 'verandah_column_depth', label: 'Verandah column size - depth', type: 'number' },
+      { id: 'verandah_column_width', label: 'Verandah column size - Width (in)', type: 'number' },
+      { id: 'verandah_column_depth', label: 'Verandah column size - Depth (in)', type: 'number' },
       { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
       { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
       { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
@@ -215,17 +287,19 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'external_wall_thickness_specific', label: 'External Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'external_wall_thickness_category', equals: 'specific thickness' } },
       { id: 'internal_wall_thickness_category', label: 'Internal Wall Thickness', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
       { id: 'internal_wall_thickness_specific', label: 'Internal Wall Thickness - specific', type: 'number', displayWhen: { fieldId: 'internal_wall_thickness_category', equals: 'specific thickness' } },
-      { id: 'window_size_length', label: 'Typical size of window - Length', type: 'number' },
-      { id: 'window_size_height', label: 'Typical size of window - Height', type: 'number' },
-      { id: 'door_size_length', label: 'Typical size of door - Length', type: 'number' },
-      { id: 'door_size_height', label: 'Typical size of door - Height', type: 'number' },
+      { id: 'window_size_length', label: 'Typical size of window - Length (ft)', type: 'number' },
+      { id: 'window_size_height', label: 'Typical size of window - Height (ft)', type: 'number' },
+      { id: 'door_size_length', label: 'Typical size of door - Length (ft)', type: 'number' },
+      { id: 'door_size_height', label: 'Typical size of door - Height (ft)', type: 'number' },
       { id: 'opening_alignment_vertical', label: 'Opening alignment in vertical direction', type: 'select', options: ['Aligned', 'Not aligned'] },
       { id: 'wall_column_connection', label: 'Connection between stone masonry wall and vertical confining column', type: 'select', options: ['Toothing provided', 'Not provided'] },
-      { id: 'vertical_confining_size', label: 'Size vertical confining element/column', type: 'number' },
+      { id: 'vertical_confining_width', label: 'Vertical confining element/column size - Width (in)', type: 'number' },
+      { id: 'vertical_confining_depth', label: 'Vertical confining element/column size - Depth (in)', type: 'number' },
       { id: 'vertical_confining_location', label: 'Location of vertical confining element/column', type: 'select', options: ['At all corners only', 'At some corners', 'Intermediate elements are also provided'] },
       { id: 'vertical_confining_max_spacing', label: 'Maximum spacing of vertical confining elements', type: 'number' },
       { id: 'vertical_opening_elements', label: 'Vertical confining elements at openings', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'vertical_opening_elements_size', label: 'Vertical confining elements at openings - size', type: 'number', displayWhen: { fieldId: 'vertical_opening_elements', equals: 'Provided' } },
+      { id: 'vertical_opening_elements_width', label: 'Vertical confining elements at openings size - Width (in)', type: 'number', displayWhen: { fieldId: 'vertical_opening_elements', equals: 'Provided' } },
+      { id: 'vertical_opening_elements_depth', label: 'Vertical confining elements at openings size - Depth (in)', type: 'number', displayWhen: { fieldId: 'vertical_opening_elements', equals: 'Provided' } },
       { id: 'plinth_band', label: 'Horizontal Plinth bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
       { id: 'plinth_band_size', label: 'Horizontal Plinth bands/beams - size', type: 'number', displayWhen: { fieldId: 'plinth_band', equals: 'Provided' } },
       { id: 'lintel_band', label: 'Horizontal Lintel bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
@@ -235,8 +309,8 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'sill_band', label: 'Horizontal Sill bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
       { id: 'sill_band_size', label: 'Horizontal Sill bands/beams - size', type: 'number', displayWhen: { fieldId: 'sill_band', equals: 'Provided' } },
       { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'Stone masonry column'] },
-      { id: 'verandah_column_width', label: 'Verandah column size - width', type: 'number' },
-      { id: 'verandah_column_depth', label: 'Verandah column size - depth', type: 'number' },
+      { id: 'verandah_column_width', label: 'Verandah column size - Width (in)', type: 'number' },
+      { id: 'verandah_column_depth', label: 'Verandah column size - Depth (in)', type: 'number' },
       { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
       { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
       { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
@@ -255,25 +329,25 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'single storey', equalsAny: ['single storey', 'double storey'] } },
       { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'double storey' } },
       { id: 'type_of_block', label: 'Type of block', type: 'select', options: ['Concrete solid block', 'Concrete hollow block', 'adobe solid block'] },
-      { id: 'size_of_block_width', label: 'Size of block - length', type: 'number' },
-      { id: 'size_of_block_depth', label: 'Size of block - width', type: 'number' },
-      { id: 'size_of_block_height', label: 'Size of block - height', type: 'number' },
+      { id: 'size_of_block_width', label: 'Size of block - Length (in)', type: 'number' },
+      { id: 'size_of_block_depth', label: 'Size of block - Width (in)', type: 'number' },
+      { id: 'size_of_block_height', label: 'Size of block - Height (in)', type: 'number' },
       { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
       { id: 'construction_material_distance', label: 'Construction material distance(km)', type: 'number' },
       { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Mud mortar', 'Cement-sand mortar'] },
       { id: 'orthogonal_wall_connection', label: 'Connection between orthogonal walls', type: 'select', options: ['adequate with proper overlap', 'not adequate connection'] },
       { id: 'wall_thickness', label: 'Wall Thickness', type: 'number' },
-      { id: 'window_size_length', label: 'Typical size of window - Length', type: 'number' },
-      { id: 'window_size_height', label: 'Typical size of window - Height', type: 'number' },
-      { id: 'door_size_length', label: 'Typical size of door - Length', type: 'number' },
-      { id: 'door_size_height', label: 'Typical size of door - Height', type: 'number' },
+      { id: 'window_size_length', label: 'Typical size of window - Length (ft)', type: 'number' },
+      { id: 'window_size_height', label: 'Typical size of window - Height (ft)', type: 'number' },
+      { id: 'door_size_length', label: 'Typical size of door - Length (ft)', type: 'number' },
+      { id: 'door_size_height', label: 'Typical size of door - Height (ft)', type: 'number' },
       { id: 'lintel_beam_type', label: 'Type of lintel beam', type: 'select', options: ['Continuous on all opening', 'separate on each opening'] },
       { id: 'opening_alignment_vertical', label: 'Opening alignment in vertical direction', type: 'select', options: ['Aligned', 'Not aligned'] },
       { id: 'lintel_beam_material', label: 'Material of lintel beam', type: 'select', options: ['wooden beam', 'stone beam', 'RC beam', 'other'] },
       { id: 'lintel_beam_material_other', label: 'Material of lintel beam - other', type: 'text', displayWhen: { fieldId: 'lintel_beam_material', equals: 'other' } },
       { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'block masonry column'] },
-      { id: 'verandah_column_width', label: 'Verandah column size - width', type: 'number' },
-      { id: 'verandah_column_depth', label: 'Verandah column size - depth', type: 'number' },
+      { id: 'verandah_column_width', label: 'Verandah column size - Width (in)', type: 'number' },
+      { id: 'verandah_column_depth', label: 'Verandah column size - Depth (in)', type: 'number' },
       { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
       { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
       { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
@@ -292,24 +366,26 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'storey_height_ground', label: 'Storey height: Ground floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'single storey', equalsAny: ['single storey', 'double storey'] } },
       { id: 'storey_height_first', label: 'Storey height: First floor', type: 'number', displayWhen: { fieldId: 'no_of_storey', equals: 'double storey' } },
       { id: 'type_of_block', label: 'Type of block', type: 'select', options: ['Concrete solid block', 'Concrete hollow block', 'adobe solid block'] },
-      { id: 'size_of_block_width', label: 'Size of block - length', type: 'number' },
-      { id: 'size_of_block_depth', label: 'Size of block - width', type: 'number' },
-      { id: 'size_of_block_height', label: 'Size of block - height', type: 'number' },
+      { id: 'size_of_block_width', label: 'Size of block - Length (in)', type: 'number' },
+      { id: 'size_of_block_depth', label: 'Size of block - Width (in)', type: 'number' },
+      { id: 'size_of_block_height', label: 'Size of block - Height (in)', type: 'number' },
       { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
       { id: 'construction_material_distance', label: 'Construction material distance(km)', type: 'number' },
       { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Dry/No mortar', 'Mud mortar', 'Cement-sand mortar'] },
       { id: 'wall_thickness', label: 'Wall Thickness', type: 'number' },
-      { id: 'window_size_length', label: 'Typical size of window - Length', type: 'number' },
-      { id: 'window_size_height', label: 'Typical size of window - Height', type: 'number' },
-      { id: 'door_size_length', label: 'Typical size of door - Length', type: 'number' },
-      { id: 'door_size_height', label: 'Typical size of door - Height', type: 'number' },
+      { id: 'window_size_length', label: 'Typical size of window - Length (ft)', type: 'number' },
+      { id: 'window_size_height', label: 'Typical size of window - Height (ft)', type: 'number' },
+      { id: 'door_size_length', label: 'Typical size of door - Length (ft)', type: 'number' },
+      { id: 'door_size_height', label: 'Typical size of door - Height (ft)', type: 'number' },
       { id: 'opening_alignment_vertical', label: 'Opening alignment in vertical direction', type: 'select', options: ['Aligned', 'Not aligned'] },
       { id: 'wall_column_connection', label: 'Connection between block masonry wall and vertical confining column', type: 'select', options: ['Toothing provided', 'Not provided'] },
-      { id: 'vertical_confining_size', label: 'Size vertical confining element/column', type: 'number' },
+      { id: 'vertical_confining_width', label: 'Vertical confining element/column size - Width (in)', type: 'number' },
+      { id: 'vertical_confining_depth', label: 'Vertical confining element/column size - Depth (in)', type: 'number' },
       { id: 'vertical_confining_location', label: 'Location of vertical confining element/column', type: 'select', options: ['At all corners only', 'At some corners', 'Intermediate elements are also provided'] },
       { id: 'vertical_confining_max_spacing', label: 'Maximum spacing of vertical confining elements', type: 'number' },
       { id: 'vertical_opening_elements', label: 'Vertical confining elements at openings', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'vertical_opening_elements_size', label: 'Vertical confining elements at openings - size', type: 'number', displayWhen: { fieldId: 'vertical_opening_elements', equals: 'Provided' } },
+      { id: 'vertical_opening_elements_width', label: 'Vertical confining elements at openings size - Width (in)', type: 'number', displayWhen: { fieldId: 'vertical_opening_elements', equals: 'Provided' } },
+      { id: 'vertical_opening_elements_depth', label: 'Vertical confining elements at openings size - Depth (in)', type: 'number', displayWhen: { fieldId: 'vertical_opening_elements', equals: 'Provided' } },
       { id: 'plinth_band', label: 'Horizontal Plinth bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
       { id: 'plinth_band_size', label: 'Horizontal Plinth bands/beams - size', type: 'number', displayWhen: { fieldId: 'plinth_band', equals: 'Provided' } },
       { id: 'lintel_band', label: 'Horizontal Lintel bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
@@ -319,8 +395,8 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'sill_band', label: 'Horizontal Sill bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
       { id: 'sill_band_size', label: 'Horizontal Sill bands/beams - size', type: 'number', displayWhen: { fieldId: 'sill_band', equals: 'Provided' } },
       { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'block masonry column'] },
-      { id: 'verandah_column_width', label: 'Verandah column size - width', type: 'number' },
-      { id: 'verandah_column_depth', label: 'Verandah column size - depth', type: 'number' },
+      { id: 'verandah_column_width', label: 'Verandah column size - Width (in)', type: 'number' },
+      { id: 'verandah_column_depth', label: 'Verandah column size - Depth (in)', type: 'number' },
       { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
       { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
       { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
@@ -1783,6 +1859,14 @@ export default function BuildingForm() {
     setEditFieldOptions(fieldOptions || []);
     setEditingFieldNewLabel(fieldLabel || '');
     setFieldSaveStatus('idle');
+
+    // Ensure the opened inline editor is brought into view.
+    setTimeout(() => {
+      const target = document.getElementById(`field-card-${sectionId}-${fieldId}`);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 0);
   };
 
   const editFieldLabel = async (sectionId: string, fieldId: string, newLabel: string) => {
@@ -2305,7 +2389,7 @@ export default function BuildingForm() {
                 <div className="grid grid-cols-1 gap-4">
                   {section.fields.map((f, fIdx) => (
                     shouldShowField(f) && (
-                      <div key={f.id} className="bg-white p-4 sm:p-6 rounded-2xl border-2 border-slate-100 shadow-sm relative hover:border-blue-200 transition-colors">
+                      <div id={`field-card-${section.id}-${f.id}`} key={f.id} className="bg-white p-4 sm:p-6 rounded-2xl border-2 border-slate-100 shadow-sm relative hover:border-blue-200 transition-colors">
                         <div className="flex justify-between items-center mb-2">
                           <div className="flex items-center gap-2 flex-wrap">
                             <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111] flex items-center gap-1">
@@ -2317,7 +2401,7 @@ export default function BuildingForm() {
                           </div>
                           {isAdmin && (
                             <div className="flex gap-2">
-                              <button onClick={() => openFieldEditModal(f.id, section.id, f.type, f.options)} title="Edit Field" className="text-slate-300 hover:text-yellow-500"><PenTool size={14}/></button>
+                              <button onClick={() => openFieldEditModal(f.id, section.id, f.type, f.options, f.label)} title="Edit Field" className="text-slate-300 hover:text-yellow-500"><PenTool size={14}/></button>
                               <button onClick={() => toggleFieldRequired(section.id, f.id)} title={f.required ? 'Remove Required' : 'Mark Required'} className={`transition-colors p-1 ${f.required ? 'text-red-500 bg-red-50 rounded' : 'text-slate-300 hover:text-orange-500'}`}><CheckSquare size={14}/></button>
                               <button onClick={() => toggleFieldAllowComments(section.id, f.id)} title={f.allowComments ? 'Disable Comments' : 'Allow Comments'} className={`transition-colors p-1 ${f.allowComments ? 'text-blue-500 bg-blue-50 rounded' : 'text-slate-300 hover:text-blue-500'}`}>💬</button>
                               <button onClick={() => moveField(section.id, fIdx, 'up')} className="text-slate-300 hover:text-blue-500"><ArrowUp size={14}/></button>
@@ -2326,6 +2410,104 @@ export default function BuildingForm() {
                             </div>
                           )}
                         </div>
+
+                        {isAdmin && editingFieldId === f.id && editingFieldSectionId === section.id && (
+                          <div className="mb-4 p-3 rounded-xl border-2 border-[#DADDE3] bg-slate-50 space-y-3">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-600">Edit Question</p>
+                            <div>
+                              <label className="text-[10px] font-black uppercase text-[#111111]">Question Label</label>
+                              <input
+                                type="text"
+                                className="w-full mt-1 p-2 bg-white rounded-lg font-bold text-xs border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]"
+                                value={editingFieldNewLabel}
+                                onChange={(e) => setEditingFieldNewLabel(e.target.value)}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-black uppercase text-[#111111]">Question Type</label>
+                              <select
+                                className="w-full mt-1 p-2 bg-white rounded-lg font-bold text-xs border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]"
+                                value={editFieldType}
+                                onChange={(e) => setEditFieldType(e.target.value as FieldType)}
+                              >
+                                {(['text', 'number', 'date', 'select', 'multi_select', 'checkbox', 'image', 'gps', 'group', 'dynamic_series'] as FieldType[]).map(t => (
+                                  <option key={t} value={t}>{getFieldTypeLabel(t)}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {(editFieldType === 'select' || editFieldType === 'multi_select') && (
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-[#111111]">Options</label>
+                                {editFieldOptions.map((opt, idx) => (
+                                  <div key={`${f.id}-opt-${idx}`} className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      className="flex-1 p-2 bg-white rounded-lg font-bold text-xs border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]"
+                                      value={opt}
+                                      onChange={(e) => {
+                                        const next = [...editFieldOptions];
+                                        next[idx] = e.target.value;
+                                        setEditFieldOptions(next);
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditFieldOptions(editFieldOptions.filter((_, i) => i !== idx))}
+                                      className="px-2 py-1 text-xs font-black rounded bg-red-100 text-red-600 hover:bg-red-200"
+                                    >
+                                      X
+                                    </button>
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => setEditFieldOptions([...editFieldOptions, ''])}
+                                  className="px-3 py-1 text-[10px] font-black rounded bg-[#001F3F] text-[#39CCCC]"
+                                >
+                                  + Add Option
+                                </button>
+                              </div>
+                            )}
+
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!editingFieldSectionId || !editingFieldId) return;
+                                  setFieldSaveStatus('saving');
+                                  await editFieldLabel(editingFieldSectionId, editingFieldId, editingFieldNewLabel);
+                                  await updateFieldTypeAsync(editingFieldSectionId, editingFieldId, editFieldType);
+                                  if (editFieldType === 'select' || editFieldType === 'multi_select') {
+                                    const normalizedOptions = editFieldOptions.map(opt => opt.trim()).filter(Boolean);
+                                    await updateFieldOptions(editingFieldSectionId, editingFieldId, normalizedOptions);
+                                  }
+                                  setFieldSaveStatus('saved');
+                                  setTimeout(() => {
+                                    setEditingFieldId(null);
+                                    setEditingFieldSectionId(null);
+                                    setFieldSaveStatus('idle');
+                                  }, 500);
+                                }}
+                                className="px-3 py-2 text-[10px] font-black rounded bg-[#85144B] text-white hover:bg-[#600e35]"
+                              >
+                                {fieldSaveStatus === 'saving' ? 'Saving...' : fieldSaveStatus === 'saved' ? 'Saved' : 'Save'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingFieldId(null);
+                                  setEditingFieldSectionId(null);
+                                  setFieldSaveStatus('idle');
+                                }}
+                                className="px-3 py-2 text-[10px] font-black rounded bg-slate-200 text-slate-700 hover:bg-slate-300"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
                         {f.type === 'text' && (
                           f.autoDate ? (
@@ -2454,6 +2636,39 @@ export default function BuildingForm() {
                 <div className="grid grid-cols-1 gap-4">
                   {selectedTypologyDefinition.fields.map(field => {
                     if (!isTypologyFieldVisible(field, currentTypologyData.responses || {})) return null;
+
+                    const group = TYPOLOGY_FIELD_GROUP_BY_ID[field.id];
+                    if (group) {
+                      // Render the grouped question once, at the first visible member field.
+                      const visibleMemberFields = selectedTypologyDefinition.fields.filter(
+                        member => group.fieldIds.includes(member.id) && isTypologyFieldVisible(member, currentTypologyData.responses || {})
+                      );
+                      if (visibleMemberFields.length === 0) return null;
+                      if (visibleMemberFields[0].id !== field.id) return null;
+
+                      return (
+                        <div key={group.id}>
+                          <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">{group.label}</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                            {visibleMemberFields.map(memberField => (
+                              <div key={memberField.id}>
+                                <label className="text-[10px] font-black uppercase text-[#111111]">
+                                  {group.subLabels[memberField.id] || memberField.label}
+                                </label>
+                                <input
+                                  type="number"
+                                  className="w-full mt-1 p-3 bg-[#FFFFFF] rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]"
+                                  placeholder="..."
+                                  value={currentTypologyData.responses?.[memberField.id] || ''}
+                                  onChange={(e) => updateTypologyResponse(memberField.id, e.target.value)}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div key={field.id}>
                         <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">{field.label}</label>
