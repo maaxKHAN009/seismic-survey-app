@@ -2053,17 +2053,13 @@ export default function BuildingForm() {
 
              <div className="max-h-96 overflow-y-auto">
                  {getFilteredReports().length === 0 ? <p className="text-xs text-slate-500 p-4">No records found</p> : getFilteredReports().map(r => {
-                   const quality = calculateQualityScore(r);
-                   const qualityColor = quality.status === 'complete' ? 'bg-green-50' : quality.status === 'partial' ? 'bg-yellow-50' : 'bg-red-50';
-                   const qualityIcon = quality.status === 'complete' ? '✅' : quality.status === 'partial' ? '🟡' : '❌';
                    return (
-                     <div key={r.id} className={`flex justify-between items-center p-3 border-b text-xs ${qualityColor}`}>
+                     <div key={r.id} className="flex justify-between items-center p-3 border-b text-xs">
                          <div className="flex-1">
                            <div className="flex items-center gap-2">
                              <span className="font-bold text-black">{r.building_id}</span>
                              <span className="text-[10px] text-slate-600">{new Date(r.created_at).toLocaleDateString()}</span>
                            </div>
-                           <div className="text-[9px] text-slate-600 mt-1">{qualityIcon} {quality.score}% Complete</div>
                          </div>
                          <div className="flex gap-2">
                              <button onClick={() => setViewingImages(Object.values(r.full_data).flatMap(v => (Array.isArray(v) && v[0]?.url) ? v : []))} className="text-[#001F3F]"><Eye size={14}/></button>
