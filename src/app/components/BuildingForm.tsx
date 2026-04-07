@@ -124,57 +124,57 @@ const ROOF_CONNECTION_OPTIONS = ['No connection/bearing', 'connection through wo
 const TYPOLOGY_FIELD_GROUPS: TypologyFieldGroup[] = [
   {
     id: 'window_size_group',
-    label: 'Typical size of window (ft)',
+    label: 'Typical size of window',
     fieldIds: ['window_size_length', 'window_size_height'],
     subLabels: {
-      window_size_length: 'Width',
-      window_size_height: 'Height'
+      window_size_length: 'Length(ft)',
+      window_size_height: 'Height(ft)'
     }
   },
   {
     id: 'door_size_group',
-    label: 'Typical size of door (ft)',
+    label: 'Typical size of door',
     fieldIds: ['door_size_length', 'door_size_height'],
     subLabels: {
-      door_size_length: 'Width',
-      door_size_height: 'Height'
+      door_size_length: 'Length(ft)',
+      door_size_height: 'Height(ft)'
     }
   },
   {
     id: 'verandah_column_group',
-    label: 'Verandah column size (in)',
+    label: 'Verandah column size',
     fieldIds: ['verandah_column_width', 'verandah_column_depth'],
     subLabels: {
-      verandah_column_width: 'Width',
-      verandah_column_depth: 'Depth'
+      verandah_column_width: 'Depth(in)',
+      verandah_column_depth: 'Width(in)'
     }
   },
   {
     id: 'block_size_group',
-    label: 'Size of block (in)',
+    label: 'Size of block',
     fieldIds: ['size_of_block_width', 'size_of_block_depth', 'size_of_block_height'],
     subLabels: {
-      size_of_block_width: 'Length',
-      size_of_block_depth: 'Width',
-      size_of_block_height: 'Height'
+      size_of_block_width: 'Length(in)',
+      size_of_block_depth: 'Width(in)',
+      size_of_block_height: 'Height(in)'
     }
   },
   {
     id: 'vertical_confining_group',
-    label: 'Vertical confining element/column size (in)',
+    label: 'Vertical confining element/column size',
     fieldIds: ['vertical_confining_width', 'vertical_confining_depth'],
     subLabels: {
-      vertical_confining_width: 'Width',
-      vertical_confining_depth: 'Depth'
+      vertical_confining_width: 'Depth(in)',
+      vertical_confining_depth: 'Width(in)'
     }
   },
   {
     id: 'vertical_opening_group',
-    label: 'Vertical confining elements at openings size (in)',
+    label: 'Vertical confining elements at openings size',
     fieldIds: ['vertical_opening_elements_width', 'vertical_opening_elements_depth'],
     subLabels: {
-      vertical_opening_elements_width: 'Width',
-      vertical_opening_elements_depth: 'Depth'
+      vertical_opening_elements_width: 'Depth(in)',
+      vertical_opening_elements_depth: 'Width(in)'
     }
   }
 ];
