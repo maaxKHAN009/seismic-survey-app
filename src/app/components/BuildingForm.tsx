@@ -10,6 +10,7 @@ import Dexie, { type Table } from 'dexie';
 import ExcelJS from 'exceljs';
 // @ts-ignore
 import { saveAs } from 'file-saver';
+import LogRocket from 'logrocket';
 import { 
   Info, Database, Settings, PlusCircle, Trash2, 
   X, CheckSquare, Camera, ChevronRight, FileDown, 
@@ -617,6 +618,8 @@ const DynamicSeries = ({ value, onChange, darkModeProp = false }: { value: Dynam
 // 3. MAIN COMPONENT LOGIC
 // ==========================================
 export default function BuildingForm() {
+  const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null);
+  const isUpdatingRef = useRef(false);
   const [isOnline, setIsOnline] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -624,6 +627,8 @@ export default function BuildingForm() {
   
   // NEW: State for Offline Installation Prompt
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [updatingApp, setUpdatingApp] = useState(false);
   
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -920,6 +925,36 @@ export default function BuildingForm() {
       setInstallPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handlePrompt);
+
+    const handleControllerChange = () => {
+      if (isUpdatingRef.current) {
+        window.location.reload();
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((registration) => {
+        swRegistrationRef.current = registration;
+
+        if (registration.waiting) {
+          setUpdateAvailable(true);
+        }
+
+        registration.addEventListener('updatefound', () => {
+          const installingWorker = registration.installing;
+          if (!installingWorker) return;
+          installingWorker.addEventListener('statechange', () => {
+            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              setUpdateAvailable(true);
+            }
+          });
+        });
+      }).catch(() => {
+        // Keep app functional even if SW registration fails on some devices.
+      });
+
+      navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+    }
     
     // NEW: Detect circular dependencies on mount
     detectCircularDependencies();
@@ -928,8 +963,40 @@ export default function BuildingForm() {
       window.removeEventListener('online', update); 
       window.removeEventListener('offline', update);
       window.removeEventListener('beforeinstallprompt', handlePrompt);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      }
     };
   }, []); 
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const intervalId = window.setInterval(() => {
+      swRegistrationRef.current?.update();
+    }, 60 * 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  const handleAppUpdateNow = async () => {
+    setUpdatingApp(true);
+    isUpdatingRef.current = true;
+
+    try {
+      await swRegistrationRef.current?.update();
+
+      if (swRegistrationRef.current?.waiting) {
+        swRegistrationRef.current.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+
+      window.location.reload();
+    } catch {
+      setUpdatingApp(false);
+      isUpdatingRef.current = false;
+      alert('Update failed. Please try again.');
+    }
+  };
 
   // NEW: Trigger Function for Offline Download
   const handleOfflineInstall = async () => {
@@ -979,6 +1046,17 @@ export default function BuildingForm() {
       setShowSurveyorModal(true);
     }
   }, []);
+
+  useEffect(() => {
+    const cleanedSurveyorName = surveyorName.trim();
+    if (!cleanedSurveyorName) return;
+
+    // Bind LogRocket sessions to the active surveyor for easier debugging and filtering.
+    LogRocket.identify(cleanedSurveyorName.toLowerCase(), {
+      name: cleanedSurveyorName,
+      surveyorName: cleanedSurveyorName,
+    });
+  }, [surveyorName]);
 
   // NEW: Track form data changes to mark as unsaved
   useEffect(() => {
@@ -2964,6 +3042,18 @@ export default function BuildingForm() {
                 className="btn btn-outline btn-sm border-2 border-emerald-600 text-emerald-800 rounded-2xl px-6 font-black uppercase tracking-widest text-[10px] gap-2 hover:bg-emerald-50"
               >
                 <HardDrive size={14} /> Download for Offline Use
+              </button>
+            </div>
+          )}
+
+          {updateAvailable && (
+            <div className="flex justify-center mb-4">
+              <button
+                onClick={handleAppUpdateNow}
+                disabled={updatingApp}
+                className="border-2 border-[#85144B] bg-[#FFE4F1] text-[#85144B] rounded-2xl px-6 py-2 font-black uppercase tracking-widest text-[10px] disabled:opacity-60"
+              >
+                {updatingApp ? 'Updating...' : 'Update Available - Update Now'}
               </button>
             </div>
           )}
