@@ -10,7 +10,6 @@ import Dexie, { type Table } from 'dexie';
 import ExcelJS from 'exceljs';
 // @ts-ignore
 import { saveAs } from 'file-saver';
-import LogRocket from 'logrocket';
 import { 
   Info, Database, Settings, PlusCircle, Trash2, 
   X, CheckSquare, Camera, ChevronRight, FileDown, 
@@ -1046,17 +1045,6 @@ export default function BuildingForm() {
       setShowSurveyorModal(true);
     }
   }, []);
-
-  useEffect(() => {
-    const cleanedSurveyorName = surveyorName.trim();
-    if (!cleanedSurveyorName) return;
-
-    // Bind LogRocket sessions to the active surveyor for easier debugging and filtering.
-    LogRocket.identify(cleanedSurveyorName.toLowerCase(), {
-      name: cleanedSurveyorName,
-      surveyorName: cleanedSurveyorName,
-    });
-  }, [surveyorName]);
 
   // NEW: Track form data changes to mark as unsaved
   useEffect(() => {

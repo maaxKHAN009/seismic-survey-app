@@ -16,7 +16,6 @@
     "dexie": "^4.3.0",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
-    "logrocket": "^12.1.0",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "react": "19.2.3",
