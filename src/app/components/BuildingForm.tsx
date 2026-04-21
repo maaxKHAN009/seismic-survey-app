@@ -726,6 +726,7 @@ export default function BuildingForm() {
   // NEW: State for Offline Installation Prompt
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [showUpdateToast, setShowUpdateToast] = useState(false);
   const [updatingApp, setUpdatingApp] = useState(false);
   const [showQuestionSyncGate, setShowQuestionSyncGate] = useState(false);
   const [questionSyncStatus, setQuestionSyncStatus] = useState<'idle' | 'waiting-online' | 'downloading' | 'ready' | 'error'>('idle');
@@ -1154,6 +1155,11 @@ export default function BuildingForm() {
     loadSchema();
     loadReports();
     checkPending();
+
+    const markUpdateAvailable = () => {
+      setUpdateAvailable(true);
+      setShowUpdateToast(true);
+    };
   
     // NEW: Capture Install Prompt Event
     const handlePrompt = (e: any) => {
@@ -1173,7 +1179,7 @@ export default function BuildingForm() {
         swRegistrationRef.current = registration;
 
         if (registration.waiting) {
-          setUpdateAvailable(true);
+          markUpdateAvailable();
         }
 
         registration.addEventListener('updatefound', () => {
@@ -1181,7 +1187,7 @@ export default function BuildingForm() {
           if (!installingWorker) return;
           installingWorker.addEventListener('statechange', () => {
             if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              setUpdateAvailable(true);
+              markUpdateAvailable();
             }
           });
         });
@@ -1224,6 +1230,7 @@ export default function BuildingForm() {
         swRegistrationRef.current.waiting.postMessage({ type: 'SKIP_WAITING' });
       }
 
+      setShowUpdateToast(false);
       window.location.reload();
     } catch {
       setUpdatingApp(false);
@@ -3392,18 +3399,6 @@ export default function BuildingForm() {
             </div>
           )}
 
-          {updateAvailable && (
-            <div className="flex justify-center mb-4">
-              <button
-                onClick={handleAppUpdateNow}
-                disabled={updatingApp}
-                className="border-2 border-[#85144B] bg-[#FFE4F1] text-[#85144B] rounded-2xl px-6 py-2 font-black uppercase tracking-widest text-[10px] disabled:opacity-60"
-              >
-                {updatingApp ? 'Updating...' : 'Update Available - Update Now'}
-              </button>
-            </div>
-          )}
-
           {surveyTab === 'typology' && (
             <button onClick={submitReport} className="w-full bg-[#85144B] text-[#FFFFFF] font-black py-5 rounded-[2rem] shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs sticky bottom-4 z-10 border-4 border-white ring-2 ring-slate-100">
               <CheckSquare size={18} /> {isOnlineForRender ? 'SUBMIT PROFORMA' : 'SAVE LOCALLY'}
@@ -3553,6 +3548,24 @@ export default function BuildingForm() {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {updateAvailable && showUpdateToast && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[210] w-[calc(100%-2rem)] max-w-lg">
+          <div className="rounded-2xl border-2 border-[#85144B] bg-white shadow-2xl p-4 flex items-center justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#85144B]">Update Available</p>
+              <p className="text-xs font-bold text-[#001F3F]">A new version is available. Tap update to refresh now.</p>
+            </div>
+            <button
+              onClick={handleAppUpdateNow}
+              disabled={updatingApp}
+              className="shrink-0 bg-[#85144B] text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider disabled:opacity-60 flex items-center gap-2"
+            >
+              <RefreshCcw size={14} className={updatingApp ? 'animate-spin' : ''} /> {updatingApp ? 'Updating...' : 'Update'}
+            </button>
           </div>
         </div>
       )}
