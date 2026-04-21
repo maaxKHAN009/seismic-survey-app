@@ -5,7 +5,7 @@
 // ==========================================
 import { supabase } from '@/lib/supabase';
 import { PROFORMA_SECTIONS } from '@/proforma_schema';
-import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Dexie, { type Table } from 'dexie';
 import ExcelJS from 'exceljs';
 // @ts-ignore
@@ -510,19 +510,8 @@ const parseTypologySpecificData = (raw: any): TypologySpecificData => {
 
 const DRAFT_STORAGE_KEY = 'formDataDraft';
 const ACTIVE_DRAFT_ID = 'active_form_draft';
-
-const subscribeOnlineStatus = (callback: () => void) => {
-  if (typeof window === 'undefined') return () => {};
-  window.addEventListener('online', callback);
-  window.addEventListener('offline', callback);
-  return () => {
-    window.removeEventListener('online', callback);
-    window.removeEventListener('offline', callback);
-  };
-};
-
-const getOnlineSnapshot = () => (typeof navigator === 'undefined' ? true : navigator.onLine);
-const getServerOnlineSnapshot = () => true;
+const QUESTION_SYNC_REQUIRED_KEY = 'questionSyncRequired';
+const QUESTION_SYNC_COMPLETED_AT_KEY = 'questionSyncCompletedAt';
 
 const isImageObjectArray = (value: any): value is ImageObject[] => {
   return Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && 'url' in value[0];
@@ -728,7 +717,8 @@ const DynamicSeries = ({ value, onChange, darkModeProp = false }: { value: Dynam
 export default function BuildingForm() {
   const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null);
   const isUpdatingRef = useRef(false);
-  const isOnline = useSyncExternalStore(subscribeOnlineStatus, getOnlineSnapshot, getServerOnlineSnapshot);
+  const [isOnline, setIsOnline] = useState(true);
+  const [hasMounted, setHasMounted] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -737,6 +727,9 @@ export default function BuildingForm() {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updatingApp, setUpdatingApp] = useState(false);
+  const [showQuestionSyncGate, setShowQuestionSyncGate] = useState(false);
+  const [questionSyncStatus, setQuestionSyncStatus] = useState<'idle' | 'waiting-online' | 'downloading' | 'ready' | 'error'>('idle');
+  const [questionSyncCompletedAt, setQuestionSyncCompletedAt] = useState<string | null>(null);
   
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -1042,19 +1035,60 @@ export default function BuildingForm() {
     }
   };
 
-  const loadSchema = async () => { 
-    try {
-      const { data } = await supabase.from('survey_schema').select('fields').limit(1).single(); 
-      if(data && data.fields) { 
-        setSections(data.fields); 
-        if (data.fields.length > 0) setTargetSectionId(data.fields[0].id); 
-      } else { 
-        setSections(DEFAULT_SECTIONS); 
-        setTargetSectionId(DEFAULT_SECTIONS[0].id); 
-      }
-    } catch (error) {
-      setSections(DEFAULT_SECTIONS);
+  const applySections = (nextSections: Section[]) => {
+    setSections(nextSections);
+    if (nextSections.length > 0) {
+      setTargetSectionId(nextSections[0].id);
     }
+  };
+
+  const fetchRemoteSchema = async (): Promise<Section[] | null> => {
+    try {
+      const { data } = await supabase.from('survey_schema').select('fields').limit(1).single();
+      if (data && Array.isArray(data.fields)) {
+        return data.fields as Section[];
+      }
+    } catch {
+      // Caller handles fallback behavior.
+    }
+    return null;
+  };
+
+  const markQuestionSyncCompleted = () => {
+    const completedAt = new Date().toISOString();
+    localStorage.setItem(QUESTION_SYNC_REQUIRED_KEY, '0');
+    localStorage.setItem(QUESTION_SYNC_COMPLETED_AT_KEY, completedAt);
+    setQuestionSyncCompletedAt(completedAt);
+    setQuestionSyncStatus('ready');
+  };
+
+  const syncLatestQuestions = async (): Promise<boolean> => {
+    if (!hasMounted) return false;
+    if (!navigator.onLine) {
+      setQuestionSyncStatus('waiting-online');
+      return false;
+    }
+
+    setQuestionSyncStatus('downloading');
+    const remoteSections = await fetchRemoteSchema();
+    if (remoteSections) {
+      applySections(remoteSections);
+      markQuestionSyncCompleted();
+      return true;
+    }
+
+    setQuestionSyncStatus('error');
+    return false;
+  };
+
+  const loadSchema = async () => {
+    const remoteSections = await fetchRemoteSchema();
+    if (remoteSections) {
+      applySections(remoteSections);
+      return;
+    }
+
+    applySections(DEFAULT_SECTIONS);
   };
 
   const loadReports = async () => { 
@@ -1065,6 +1099,56 @@ export default function BuildingForm() {
       console.error("Archive sync failed");
     }
   };
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasMounted) return;
+
+    const handleConnectivityChange = () => {
+      setIsOnline(navigator.onLine);
+    };
+
+    handleConnectivityChange();
+    window.addEventListener('online', handleConnectivityChange);
+    window.addEventListener('offline', handleConnectivityChange);
+
+    return () => {
+      window.removeEventListener('online', handleConnectivityChange);
+      window.removeEventListener('offline', handleConnectivityChange);
+    };
+  }, [hasMounted]);
+
+  useEffect(() => {
+    if (!hasMounted) return;
+
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    const requiresSync = localStorage.getItem(QUESTION_SYNC_REQUIRED_KEY) === '1';
+    const previouslyCompletedAt = localStorage.getItem(QUESTION_SYNC_COMPLETED_AT_KEY);
+
+    if (previouslyCompletedAt) {
+      setQuestionSyncCompletedAt(previouslyCompletedAt);
+    }
+
+    if (isStandalone && requiresSync) {
+      setShowQuestionSyncGate(true);
+      void syncLatestQuestions();
+    }
+  }, [hasMounted]);
+
+  useEffect(() => {
+    if (!hasMounted || !showQuestionSyncGate) return;
+
+    if (!isOnline) {
+      setQuestionSyncStatus('waiting-online');
+      return;
+    }
+
+    if (questionSyncStatus === 'ready') return;
+    void syncLatestQuestions();
+  }, [hasMounted, isOnline, showQuestionSyncGate]);
 
   useEffect(() => {
     loadSchema();
@@ -1153,7 +1237,12 @@ export default function BuildingForm() {
     if (!installPrompt) return;
     installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
-    if (outcome === 'accepted') setInstallPrompt(null);
+    if (outcome === 'accepted') {
+      localStorage.setItem(QUESTION_SYNC_REQUIRED_KEY, '1');
+      localStorage.removeItem(QUESTION_SYNC_COMPLETED_AT_KEY);
+      setQuestionSyncCompletedAt(null);
+      setInstallPrompt(null);
+    }
   };
 
   // NEW: Real-time Autosave Effect (save immediately on any change)
@@ -2341,6 +2430,7 @@ export default function BuildingForm() {
 
   const currentTypologyData = getCurrentTypologyData();
   const selectedTypologyDefinition = currentTypologyData.selected_type ? TYPOLOGY_DEFINITION_MAP[currentTypologyData.selected_type] : undefined;
+  const isOnlineForRender = hasMounted ? isOnline : true;
   const syncProcessed = syncCompleted + syncFailed;
   const syncPercentage = syncTotal > 0 ? Math.round((syncProcessed / syncTotal) * 100) : 0;
   const syncRatePerMinute = syncStartedAt && syncProcessed > 0
@@ -2355,12 +2445,12 @@ export default function BuildingForm() {
          <p className="text-xs font-bold text-[#85144B] uppercase tracking-[0.2em]">Building Specific Survey</p>
       </div>
 
-      <div className={`p-4 rounded-xl border-2 flex items-center justify-between shadow-sm ${isOnline ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
+      <div className={`p-4 rounded-xl border-2 flex items-center justify-between shadow-sm ${isOnlineForRender ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
         <div className="flex items-center gap-2">
-          {isOnline ? <Wifi className="text-green-700" size={20} /> : <WifiOff className="text-orange-700" size={20} />}
-          <span className={`text-xs font-black uppercase ${isOnline ? 'text-green-900' : 'text-orange-900'}`}>{isOnline ? 'System Online' : 'Offline Vault Active'}</span>
+          {isOnlineForRender ? <Wifi className="text-green-700" size={20} /> : <WifiOff className="text-orange-700" size={20} />}
+          <span className={`text-xs font-black uppercase ${isOnlineForRender ? 'text-green-900' : 'text-orange-900'}`}>{isOnlineForRender ? 'System Online' : 'Offline Vault Active'}</span>
         </div>
-        {pendingCount > 0 && isOnline && (
+        {pendingCount > 0 && isOnlineForRender && (
           <button onClick={runSync} disabled={syncing} className="bg-[#85144B] text-white px-4 py-2 rounded-lg text-xs font-black animate-pulse flex items-center gap-2 shadow-md">
             <RefreshCcw size={14} className={syncing ? 'animate-spin' : ''} /> PUSH {pendingCount}
           </button>
@@ -3103,7 +3193,7 @@ export default function BuildingForm() {
                           </div>
                         )}
 
-                        {f.type === 'image' && <ImageUpload label={f.label} value={formData[f.label] || []} onChange={(imgs) => setFormData({...formData, [f.label]: imgs})} isOnline={isOnline} />}
+                        {f.type === 'image' && <ImageUpload label={f.label} value={formData[f.label] || []} onChange={(imgs) => setFormData({...formData, [f.label]: imgs})} isOnline={isOnlineForRender} />}
                         
                         {f.type === 'gps' && (
                           <div className="flex gap-2">
@@ -3316,7 +3406,7 @@ export default function BuildingForm() {
 
           {surveyTab === 'typology' && (
             <button onClick={submitReport} className="w-full bg-[#85144B] text-[#FFFFFF] font-black py-5 rounded-[2rem] shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs sticky bottom-4 z-10 border-4 border-white ring-2 ring-slate-100">
-              <CheckSquare size={18} /> {isOnline ? 'SUBMIT PROFORMA' : 'SAVE LOCALLY'}
+              <CheckSquare size={18} /> {isOnlineForRender ? 'SUBMIT PROFORMA' : 'SAVE LOCALLY'}
             </button>
           )}
         </>
@@ -3392,7 +3482,7 @@ export default function BuildingForm() {
                        <textarea placeholder="Add explanation or additional notes (optional)" className="w-full p-3 bg-slate-50 rounded-xl font-bold text-sm border-2 border-slate-300 text-black min-h-24 resize-none" value={editingReport.full_data[`${f.label}_comment`] || ''} onChange={(e) => handleEditChange(`${f.label}_comment`, e.target.value)} />
                     )}
                     {f.type === 'image' && (
-                       <ImageUpload label={f.label} value={editingReport.full_data[f.label] || []} onChange={(imgs) => handleEditChange(f.label, imgs)} isOnline={isOnline} />
+                        <ImageUpload label={f.label} value={editingReport.full_data[f.label] || []} onChange={(imgs) => handleEditChange(f.label, imgs)} isOnline={isOnlineForRender} />
                     )}
                     {f.type === 'gps' && <input type="text" className="w-full p-3 bg-slate-100 font-mono text-xs border text-black" value={editingReport.full_data[f.label] || ''} readOnly />}
                   </div>
@@ -3401,6 +3491,68 @@ export default function BuildingForm() {
             ))}
 
             <button onClick={saveEditedReport} className="w-full bg-[#001F3F] text-[#39CCCC] py-4 rounded-xl font-black uppercase text-sm sticky bottom-0 shadow-xl">SAVE ALL CHANGES</button>
+          </div>
+        </div>
+      )}
+
+      {showQuestionSyncGate && (
+        <div className="fixed inset-0 z-[220] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl border-4 border-[#001F3F] shadow-2xl p-6 space-y-4">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#85144B]">Offline Setup Required</p>
+              <h3 className="text-xl font-black text-[#001F3F] leading-tight">Download Latest Questions Before Using Offline</h3>
+            </div>
+
+            {questionSyncStatus === 'ready' ? (
+              <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-emerald-800">
+                  <CheckSquare size={18} />
+                  <p className="text-sm font-black">Success. Latest questions downloaded.</p>
+                </div>
+                <p className="text-xs font-bold text-emerald-700">You can now close this popup and use the app safely offline.</p>
+                {questionSyncCompletedAt && (
+                  <p className="text-[10px] text-emerald-700">Downloaded at: {new Date(questionSyncCompletedAt).toLocaleString()}</p>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-2xl border-2 border-orange-200 bg-orange-50 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-orange-800">
+                  <WifiOff size={18} />
+                  <p className="text-sm font-black">Stay online to download the newest questions.</p>
+                </div>
+                <p className="text-xs font-bold text-orange-700">
+                  This popup cannot be closed until the latest question data is fully downloaded.
+                </p>
+                {questionSyncStatus === 'downloading' && (
+                  <p className="text-[11px] font-black text-[#001F3F] flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Downloading question data...</p>
+                )}
+                {questionSyncStatus === 'waiting-online' && (
+                  <p className="text-[11px] font-black text-orange-700">Internet connection is required to continue setup.</p>
+                )}
+                {questionSyncStatus === 'error' && (
+                  <p className="text-[11px] font-black text-red-700">Download failed. Reconnect and retry.</p>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2">
+              {questionSyncStatus === 'ready' ? (
+                <button
+                  onClick={() => setShowQuestionSyncGate(false)}
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider"
+                >
+                  Close Popup
+                </button>
+              ) : (
+                <button
+                  onClick={() => void syncLatestQuestions()}
+                  disabled={!isOnline || questionSyncStatus === 'downloading'}
+                  className="bg-[#85144B] disabled:bg-slate-300 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2"
+                >
+                  <RefreshCcw size={14} className={questionSyncStatus === 'downloading' ? 'animate-spin' : ''} /> Retry Download
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
