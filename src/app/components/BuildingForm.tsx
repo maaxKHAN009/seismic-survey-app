@@ -5,7 +5,7 @@
 // ==========================================
 import { supabase } from '@/lib/supabase';
 import { PROFORMA_SECTIONS } from '@/proforma_schema';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import Dexie, { type Table } from 'dexie';
 import ExcelJS from 'exceljs';
 // @ts-ignore
@@ -20,9 +20,14 @@ import {
 // --- Offline Database Schema (Dexie) ---
 class SeismicDB extends Dexie {
   outbox!: Table<{ id?: number; building_id: string; full_data: any; timestamp: number }>;
+  drafts!: Table<{ id: string; text_data: Record<string, any>; image_data: Record<string, ImageObject[]>; updated_at: number }>;
   constructor() {
     super('SeismicDB');
     this.version(1).stores({ outbox: '++id, building_id, timestamp' });
+    this.version(2).stores({
+      outbox: '++id, building_id, timestamp',
+      drafts: 'id, updated_at'
+    });
   }
 }
 const localDB = new SeismicDB();
@@ -187,6 +192,51 @@ const TYPOLOGY_FIELD_GROUPS: TypologyFieldGroup[] = [
       vertical_opening_elements_width: 'Depth(in)',
       vertical_opening_elements_depth: 'Width(in)'
     }
+  },
+  {
+    id: 'timber_laces_size_group',
+    label: 'Size of timber laces(in)',
+    fieldIds: ['size_of_timber_laces_width', 'size_of_timber_laces_depth'],
+    subLabels: {
+      size_of_timber_laces_width: 'Width(in)',
+      size_of_timber_laces_depth: 'Depth(in)'
+    }
+  },
+  {
+    id: 'plinth_band_size_group',
+    label: 'Horizontal Plinth bands/beams - size(in)',
+    fieldIds: ['plinth_band_size_width', 'plinth_band_size_depth'],
+    subLabels: {
+      plinth_band_size_width: 'Width(in)',
+      plinth_band_size_depth: 'Depth(in)'
+    }
+  },
+  {
+    id: 'lintel_band_size_group',
+    label: 'Horizontal Lintel bands/beams - size(in)',
+    fieldIds: ['lintel_band_size_width', 'lintel_band_size_depth'],
+    subLabels: {
+      lintel_band_size_width: 'Width(in)',
+      lintel_band_size_depth: 'Depth(in)'
+    }
+  },
+  {
+    id: 'roof_floor_band_size_group',
+    label: 'Horizontal Roof/floor bands/beams - size(in)',
+    fieldIds: ['roof_floor_band_size_width', 'roof_floor_band_size_depth'],
+    subLabels: {
+      roof_floor_band_size_width: 'Width(in)',
+      roof_floor_band_size_depth: 'Depth(in)'
+    }
+  },
+  {
+    id: 'sill_band_size_group',
+    label: 'Horizontal Sill bands/beams - size(in)',
+    fieldIds: ['sill_band_size_width', 'sill_band_size_depth'],
+    subLabels: {
+      sill_band_size_width: 'Width(in)',
+      sill_band_size_depth: 'Depth(in)'
+    }
   }
 ];
 
@@ -257,7 +307,8 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'internal_wall_thickness_category', label: 'Internal Wall Thickness(in)', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
       { id: 'internal_wall_thickness_specific', label: 'Internal Wall Thickness(in) - specific', type: 'number', displayWhen: { fieldId: 'internal_wall_thickness_category', equals: 'specific thickness' } },
       { id: 'spacing_between_timber_laces', label: 'Spacing Between Timber Laces (ft)', type: 'number' },
-      { id: 'size_of_timber_laces', label: 'Size of timber laces(in)', type: 'number' },
+      { id: 'size_of_timber_laces_width', label: 'Size of timber laces - Width (in)', type: 'number' },
+      { id: 'size_of_timber_laces_depth', label: 'Size of timber laces - Depth (in)', type: 'number' },
       { id: 'longitudinal_cross_connection', label: 'Connection between longitudinal timber laces and cross members', type: 'select', options: ['nailed', 'half connection'] },
       { id: 'spacing_of_cross_members', label: 'Spacing of cross members', type: 'number' },
       { id: 'corner_timber_connection', label: 'Connection between timber laces at wall corner', type: 'select', options: ['No connection', 'Nailed', 'Half connection with projection', 'half connection without projection'] },
@@ -312,13 +363,17 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'vertical_opening_elements_width', label: 'Vertical confining elements at openings size - Width (in)', type: 'number', displayWhen: { fieldId: 'vertical_opening_elements', equals: 'Provided' } },
       { id: 'vertical_opening_elements_depth', label: 'Vertical confining elements at openings size - Depth (in)', type: 'number', displayWhen: { fieldId: 'vertical_opening_elements', equals: 'Provided' } },
       { id: 'plinth_band', label: 'Horizontal Plinth bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'plinth_band_size', label: 'Horizontal Plinth bands/beams - size(in)', type: 'number', displayWhen: { fieldId: 'plinth_band', equals: 'Provided' } },
+      { id: 'plinth_band_size_width', label: 'Horizontal Plinth bands/beams - Width(in)', type: 'number', displayWhen: { fieldId: 'plinth_band', equals: 'Provided' } },
+      { id: 'plinth_band_size_depth', label: 'Horizontal Plinth bands/beams - Depth(in)', type: 'number', displayWhen: { fieldId: 'plinth_band', equals: 'Provided' } },
       { id: 'lintel_band', label: 'Horizontal Lintel bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'lintel_band_size', label: 'Horizontal Lintel bands/beams - size(in)', type: 'number', displayWhen: { fieldId: 'lintel_band', equals: 'Provided' } },
+      { id: 'lintel_band_size_width', label: 'Horizontal Lintel bands/beams - Width(in)', type: 'number', displayWhen: { fieldId: 'lintel_band', equals: 'Provided' } },
+      { id: 'lintel_band_size_depth', label: 'Horizontal Lintel bands/beams - Depth(in)', type: 'number', displayWhen: { fieldId: 'lintel_band', equals: 'Provided' } },
       { id: 'roof_floor_band', label: 'Horizontal Roof/floor bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'roof_floor_band_size', label: 'Horizontal Roof/floor bands/beams - size(in)', type: 'number', displayWhen: { fieldId: 'roof_floor_band', equals: 'Provided' } },
+      { id: 'roof_floor_band_size_width', label: 'Horizontal Roof/floor bands/beams - Width(in)', type: 'number', displayWhen: { fieldId: 'roof_floor_band', equals: 'Provided' } },
+      { id: 'roof_floor_band_size_depth', label: 'Horizontal Roof/floor bands/beams - Depth(in)', type: 'number', displayWhen: { fieldId: 'roof_floor_band', equals: 'Provided' } },
       { id: 'sill_band', label: 'Horizontal Sill bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'sill_band_size', label: 'Horizontal Sill bands/beams - size(in)', type: 'number', displayWhen: { fieldId: 'sill_band', equals: 'Provided' } },
+      { id: 'sill_band_size_width', label: 'Horizontal Sill bands/beams - Width(in)', type: 'number', displayWhen: { fieldId: 'sill_band', equals: 'Provided' } },
+      { id: 'sill_band_size_depth', label: 'Horizontal Sill bands/beams - Depth(in)', type: 'number', displayWhen: { fieldId: 'sill_band', equals: 'Provided' } },
       { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'Stone masonry column'] },
       { id: 'verandah_column_width', label: 'Verandah column size - Width (in)', type: 'number' },
       { id: 'verandah_column_depth', label: 'Verandah column size - Depth (in)', type: 'number' },
@@ -398,13 +453,17 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'vertical_opening_elements_width', label: 'Vertical confining elements at openings size - Width (in)', type: 'number', displayWhen: { fieldId: 'vertical_opening_elements', equals: 'Provided' } },
       { id: 'vertical_opening_elements_depth', label: 'Vertical confining elements at openings size - Depth (in)', type: 'number', displayWhen: { fieldId: 'vertical_opening_elements', equals: 'Provided' } },
       { id: 'plinth_band', label: 'Horizontal Plinth bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'plinth_band_size', label: 'Horizontal Plinth bands/beams - size(in)', type: 'number', displayWhen: { fieldId: 'plinth_band', equals: 'Provided' } },
+      { id: 'plinth_band_size_width', label: 'Horizontal Plinth bands/beams - Width(in)', type: 'number', displayWhen: { fieldId: 'plinth_band', equals: 'Provided' } },
+      { id: 'plinth_band_size_depth', label: 'Horizontal Plinth bands/beams - Depth(in)', type: 'number', displayWhen: { fieldId: 'plinth_band', equals: 'Provided' } },
       { id: 'lintel_band', label: 'Horizontal Lintel bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'lintel_band_size', label: 'Horizontal Lintel bands/beams - size(in)', type: 'number', displayWhen: { fieldId: 'lintel_band', equals: 'Provided' } },
+      { id: 'lintel_band_size_width', label: 'Horizontal Lintel bands/beams - Width(in)', type: 'number', displayWhen: { fieldId: 'lintel_band', equals: 'Provided' } },
+      { id: 'lintel_band_size_depth', label: 'Horizontal Lintel bands/beams - Depth(in)', type: 'number', displayWhen: { fieldId: 'lintel_band', equals: 'Provided' } },
       { id: 'roof_floor_band', label: 'Horizontal Roof/floor bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'roof_floor_band_size', label: 'Horizontal Roof/floor bands/beams - size(in)', type: 'number', displayWhen: { fieldId: 'roof_floor_band', equals: 'Provided' } },
+      { id: 'roof_floor_band_size_width', label: 'Horizontal Roof/floor bands/beams - Width(in)', type: 'number', displayWhen: { fieldId: 'roof_floor_band', equals: 'Provided' } },
+      { id: 'roof_floor_band_size_depth', label: 'Horizontal Roof/floor bands/beams - Depth(in)', type: 'number', displayWhen: { fieldId: 'roof_floor_band', equals: 'Provided' } },
       { id: 'sill_band', label: 'Horizontal Sill bands/beams', type: 'select', options: ['Provided', 'Not provided'] },
-      { id: 'sill_band_size', label: 'Horizontal Sill bands/beams - size(in)', type: 'number', displayWhen: { fieldId: 'sill_band', equals: 'Provided' } },
+      { id: 'sill_band_size_width', label: 'Horizontal Sill bands/beams - Width(in)', type: 'number', displayWhen: { fieldId: 'sill_band', equals: 'Provided' } },
+      { id: 'sill_band_size_depth', label: 'Horizontal Sill bands/beams - Depth(in)', type: 'number', displayWhen: { fieldId: 'sill_band', equals: 'Provided' } },
       { id: 'verandah_column_type', label: 'Verandah column', type: 'select', options: ['RC column', 'Wooden column', 'block masonry column'] },
       { id: 'verandah_column_width', label: 'Verandah column size - Width (in)', type: 'number' },
       { id: 'verandah_column_depth', label: 'Verandah column size - Depth (in)', type: 'number' },
@@ -449,6 +508,50 @@ const parseTypologySpecificData = (raw: any): TypologySpecificData => {
   return emptyTypologyData();
 };
 
+const DRAFT_STORAGE_KEY = 'formDataDraft';
+const ACTIVE_DRAFT_ID = 'active_form_draft';
+
+const subscribeOnlineStatus = (callback: () => void) => {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener('online', callback);
+  window.addEventListener('offline', callback);
+  return () => {
+    window.removeEventListener('online', callback);
+    window.removeEventListener('offline', callback);
+  };
+};
+
+const getOnlineSnapshot = () => (typeof navigator === 'undefined' ? true : navigator.onLine);
+const getServerOnlineSnapshot = () => true;
+
+const isImageObjectArray = (value: any): value is ImageObject[] => {
+  return Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && 'url' in value[0];
+};
+
+const splitDraftPayload = (source: Record<string, any>) => {
+  const textData: Record<string, any> = {};
+  const imageData: Record<string, ImageObject[]> = {};
+
+  Object.entries(source).forEach(([key, value]) => {
+    if (isImageObjectArray(value)) {
+      imageData[key] = value;
+      return;
+    }
+    textData[key] = value;
+  });
+
+  return { textData, imageData };
+};
+
+const isQuotaExceededError = (error: unknown) => {
+  return error instanceof DOMException && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+};
+
+const getTodayDateDisplay = () => {
+  const today = new Date();
+  return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+};
+
 // ==========================================
 // 2. SUB-COMPONENTS
 // ==========================================
@@ -472,7 +575,7 @@ const Tooltip = ({ text }: { text: string }) => {
   );
 };
 
-const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageObject[], onChange: (imgs: ImageObject[]) => void }) => {
+const ImageUpload = ({ label, value, onChange, isOnline }: { label: string, value: ImageObject[], onChange: (imgs: ImageObject[]) => void, isOnline: boolean }) => {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -543,7 +646,13 @@ const ImageUpload = ({ label, value, onChange }: { label: string, value: ImageOb
         {value.map((img, i) => (
           <div key={i} className={`flex gap-3 p-2 rounded-lg border items-center ${img.isLocal ? 'bg-orange-50 border-orange-300' : 'bg-[#DDDDDD] border-[#AAAAAA]'}`}>
             <div className="w-16 h-16 rounded-md overflow-hidden border border-[#111111] flex-shrink-0 relative">
-              <img src={img.url} className="w-full h-full object-cover" alt="" />
+              {img.isLocal || isOnline ? (
+                <img src={img.url} className="w-full h-full object-cover" alt="" />
+              ) : (
+                <div className="w-full h-full bg-slate-200 text-[8px] font-bold text-slate-700 flex items-center justify-center text-center px-1">
+                  Image Pending
+                </div>
+              )}
               {img.isLocal && <div className="absolute bottom-0 inset-x-0 bg-orange-600 text-white text-[8px] font-bold text-center">LOCAL</div>}
             </div>
             <div className="flex-1 min-w-0">
@@ -619,7 +728,7 @@ const DynamicSeries = ({ value, onChange, darkModeProp = false }: { value: Dynam
 export default function BuildingForm() {
   const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null);
   const isUpdatingRef = useRef(false);
-  const [isOnline, setIsOnline] = useState(true);
+  const isOnline = useSyncExternalStore(subscribeOnlineStatus, getOnlineSnapshot, getServerOnlineSnapshot);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -713,6 +822,54 @@ export default function BuildingForm() {
   const [showConditionalTestMode, setShowConditionalTestMode] = useState(false);
   const [testPreviewData, setTestPreviewData] = useState<Record<string, any>>({});
   const [circularDependencyWarnings, setCircularDependencyWarnings] = useState<string[]>([]);
+  const [showPostSubmitNewSurvey, setShowPostSubmitNewSurvey] = useState(false);
+  const [syncTotal, setSyncTotal] = useState(0);
+  const [syncCompleted, setSyncCompleted] = useState(0);
+  const [syncFailed, setSyncFailed] = useState(0);
+  const [syncCurrentBuildingId, setSyncCurrentBuildingId] = useState('');
+  const [syncStartedAt, setSyncStartedAt] = useState<number | null>(null);
+
+  const saveDraft = async (draftSource: Record<string, any>) => {
+    if (Object.keys(draftSource).length === 0) return;
+
+    const { textData, imageData } = splitDraftPayload(draftSource);
+
+    try {
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(textData));
+    } catch (error) {
+      if (isQuotaExceededError(error)) {
+        console.warn('Draft text storage is full. Saving minimal text draft only.');
+        const minimalTextData = Object.fromEntries(
+          Object.entries(textData).filter(([_, value]) => typeof value !== 'string' || value.length <= 500)
+        );
+        try {
+          localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(minimalTextData));
+        } catch {
+          // Keep UI running even if localStorage cannot persist further.
+        }
+      }
+    }
+
+    try {
+      await localDB.drafts.put({
+        id: ACTIVE_DRAFT_ID,
+        text_data: textData,
+        image_data: imageData,
+        updated_at: Date.now(),
+      });
+    } catch {
+      // If IndexedDB fails, continue without interrupting form usage.
+    }
+  };
+
+  const clearDraftStorage = async () => {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    try {
+      await localDB.drafts.delete(ACTIVE_DRAFT_ID);
+    } catch {
+      // Ignore Dexie cleanup errors.
+    }
+  };
 
 
   // ========== HELPER FUNCTIONS FOR UI ENHANCEMENTS ==========
@@ -914,10 +1071,6 @@ export default function BuildingForm() {
     loadReports();
     checkPending();
   
-    const update = () => setIsOnline(navigator.onLine);
-    window.addEventListener('online', update); 
-    window.addEventListener('offline', update);
-  
     // NEW: Capture Install Prompt Event
     const handlePrompt = (e: any) => {
       e.preventDefault();
@@ -959,8 +1112,6 @@ export default function BuildingForm() {
     detectCircularDependencies();
   
     return () => { 
-      window.removeEventListener('online', update); 
-      window.removeEventListener('offline', update);
       window.removeEventListener('beforeinstallprompt', handlePrompt);
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
@@ -1008,8 +1159,8 @@ export default function BuildingForm() {
   // NEW: Real-time Autosave Effect (save immediately on any change)
   useEffect(() => {
     if (Object.keys(formData).length === 0) return;
-    // Save draft immediately on any change
-    localStorage.setItem('formDataDraft', JSON.stringify(formData));
+    // Save text-only draft to localStorage and image payload to IndexedDB.
+    void saveDraft(formData);
     setLastSaved(new Date());
   }, [formData]);
 
@@ -1017,7 +1168,7 @@ export default function BuildingForm() {
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (Object.keys(formData).length > 0 && unsavedChanges) {
-        localStorage.setItem('formDataDraft', JSON.stringify(formData));
+        void saveDraft(formData);
         e.preventDefault();
         e.returnValue = '';
       }
@@ -1028,14 +1179,37 @@ export default function BuildingForm() {
 
   // NEW: Load autosaved draft on mount
   useEffect(() => {
-    const savedDraft = localStorage.getItem('formDataDraft');
-    if (savedDraft) {
-      try {
-        setFormData(JSON.parse(savedDraft));
-      } catch (e) {
-        console.error('Failed to load draft');
+    const restoreDraft = async () => {
+      let restoredTextData: Record<string, any> = {};
+      let restoredImageData: Record<string, ImageObject[]> = {};
+
+      const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (savedDraft) {
+        try {
+          restoredTextData = JSON.parse(savedDraft);
+        } catch {
+          console.error('Failed to parse text draft from localStorage');
+        }
       }
-    }
+
+      try {
+        const indexedDraft = await localDB.drafts.get(ACTIVE_DRAFT_ID);
+        if (indexedDraft?.image_data) {
+          restoredImageData = indexedDraft.image_data;
+        }
+      } catch {
+        console.error('Failed to restore image draft from IndexedDB');
+      }
+
+      if (Object.keys(restoredTextData).length > 0 || Object.keys(restoredImageData).length > 0) {
+        setFormData({
+          ...restoredTextData,
+          ...restoredImageData,
+        });
+      }
+    };
+
+    void restoreDraft();
 
     // Load surveyor name and show modal if not set
     const savedSurveyorName = localStorage.getItem('surveyorName');
@@ -1052,6 +1226,26 @@ export default function BuildingForm() {
       setUnsavedChanges(true);
     }
   }, [formData]);
+
+  useEffect(() => {
+    const autoDateLabels = sections
+      .flatMap(section => section.fields)
+      .filter(field => field.type === 'text' && field.autoDate)
+      .map(field => field.label);
+
+    if (autoDateLabels.length === 0) return;
+
+    const updates: Record<string, string> = {};
+    autoDateLabels.forEach(label => {
+      if (!formData[label]) {
+        updates[label] = getTodayDateDisplay();
+      }
+    });
+
+    if (Object.keys(updates).length > 0) {
+      setFormData(prev => ({ ...prev, ...updates }));
+    }
+  }, [sections, formData]);
 
   // NEW: Auto-populate Building ID and Surveyor Name when surveyor name is set
   useEffect(() => {
@@ -1346,35 +1540,74 @@ export default function BuildingForm() {
     setSyncing(true);
     try {
       const pending = await localDB.outbox.toArray();
-      for (const report of pending) {
-        const processedData = JSON.parse(JSON.stringify(report.full_data));
-        for (const key in processedData) {
-            const val = processedData[key];
-            if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && val[0].isLocal) {
-                const uploadedImages: ImageObject[] = [];
-                for (const img of val) {
-                    if (img.isLocal) {
-                        const res = await fetch(img.url);
-                        const blob = await res.blob();
-                        const file = new File([blob], `offline-${Date.now()}.jpg`, { type: "image/jpeg" });
-                        const formData = new FormData();
-                        formData.append('file', file);
-                        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-                        const uploadData = await uploadRes.json();
-                        if (uploadData.url) uploadedImages.push({ url: uploadData.url, label: img.label, isLocal: false });
-                    } else { uploadedImages.push(img); }
-                }
-                processedData[key] = uploadedImages;
-            }
-        }
-        const { error } = await supabase.from('building_reports').insert([{ building_id: report.building_id, full_data: processedData, created_at: new Date(report.timestamp).toISOString() }]);
-        if (!error) await localDB.outbox.delete(report.id!);
+      if (pending.length === 0) {
+        alert('No pending surveys to sync.');
+        return;
       }
-      await checkPending(); loadReports(); alert(`Synced ${pending.length} reports.`);
-    } catch (e) { alert("Sync interrupted."); } finally { setSyncing(false); }
+
+      setSyncTotal(pending.length);
+      setSyncCompleted(0);
+      setSyncFailed(0);
+      setSyncCurrentBuildingId('');
+      setSyncStartedAt(Date.now());
+
+      let successfulSyncs = 0;
+      let failedSyncs = 0;
+
+      for (const report of pending) {
+        setSyncCurrentBuildingId(report.building_id);
+        try {
+          const processedData = JSON.parse(JSON.stringify(report.full_data));
+          for (const key in processedData) {
+              const val = processedData[key];
+              if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && val[0].isLocal) {
+                  const uploadedImages: ImageObject[] = [];
+                  for (const img of val) {
+                      if (img.isLocal) {
+                          const res = await fetch(img.url);
+                          const blob = await res.blob();
+                          const uploadFormData = new FormData();
+                          const file = new File([blob], `offline-${Date.now()}.jpg`, { type: "image/jpeg" });
+                          uploadFormData.append('file', file);
+                          const uploadRes = await fetch('/api/upload', { method: 'POST', body: uploadFormData });
+                          const uploadData = await uploadRes.json();
+                          if (uploadData.url) uploadedImages.push({ url: uploadData.url, label: img.label, isLocal: false });
+                      } else { uploadedImages.push(img); }
+                  }
+                  processedData[key] = uploadedImages;
+              }
+          }
+
+          const { error } = await supabase.from('building_reports').insert([{ building_id: report.building_id, full_data: processedData, created_at: new Date(report.timestamp).toISOString() }]);
+          if (error) throw error;
+
+          await localDB.outbox.delete(report.id!);
+          successfulSyncs += 1;
+          setSyncCompleted(successfulSyncs);
+        } catch {
+          failedSyncs += 1;
+          setSyncFailed(failedSyncs);
+        }
+      }
+
+      await checkPending();
+      loadReports();
+      alert(`Sync complete. Uploaded ${successfulSyncs}/${pending.length}${failedSyncs > 0 ? `, Failed ${failedSyncs}` : ''}.`);
+    } catch (e) {
+      alert("Sync interrupted.");
+    } finally {
+      setSyncing(false);
+      setSyncCurrentBuildingId('');
+    }
   };
 
   const submitReport = async () => {
+    if (!isAdmin && surveyTab !== 'typology') {
+      setSurveyTab('typology');
+      alert('Please complete Building Typology before submitting.');
+      return;
+    }
+
     if (!formData['Building ID']) return alert("Critical: Building ID Required.");
     
     // FIXED: Validate required fields with conditional logic
@@ -1407,10 +1640,11 @@ export default function BuildingForm() {
             // ✅ Increment counter ONLY on successful submission
             incrementSurveyCounter(surveyorName);
             alert("✅ Packet Uploaded!"); 
-            localStorage.removeItem('formDataDraft'); 
+            await clearDraftStorage();
             setFormData({}); 
             setSurveyStartTime(null);
             setUnsavedChanges(false); 
+            setShowPostSubmitNewSurvey(true);
             loadReports(); 
           } else { throw new Error("DB Error"); }
       } catch (e) { 
@@ -1420,6 +1654,7 @@ export default function BuildingForm() {
         setFormData({}); 
         setSurveyStartTime(null);
         setUnsavedChanges(false); 
+        setShowPostSubmitNewSurvey(true);
       }
     } else {
       await localDB.outbox.add(entry); 
@@ -1430,6 +1665,7 @@ export default function BuildingForm() {
       setFormData({}); 
       setSurveyStartTime(null);
       setUnsavedChanges(false);
+      setShowPostSubmitNewSurvey(true);
     }
   };
 
@@ -1477,7 +1713,9 @@ export default function BuildingForm() {
     });
     setSurveyStartTime(startTime);
     setUnsavedChanges(false);
-    localStorage.removeItem('formDataDraft');
+    setShowPostSubmitNewSurvey(false);
+    setSurveyTab('general');
+    void clearDraftStorage();
   };
 
   const captureGPS = (label: string) => { 
@@ -2103,6 +2341,11 @@ export default function BuildingForm() {
 
   const currentTypologyData = getCurrentTypologyData();
   const selectedTypologyDefinition = currentTypologyData.selected_type ? TYPOLOGY_DEFINITION_MAP[currentTypologyData.selected_type] : undefined;
+  const syncProcessed = syncCompleted + syncFailed;
+  const syncPercentage = syncTotal > 0 ? Math.round((syncProcessed / syncTotal) * 100) : 0;
+  const syncRatePerMinute = syncStartedAt && syncProcessed > 0
+    ? (syncProcessed / Math.max((Date.now() - syncStartedAt) / 60000, 1 / 60)).toFixed(1)
+    : '0.0';
 
   return (
     <div className={`max-w-screen-lg mx-auto px-4 pb-32 pt-6 space-y-8 min-h-screen ${darkMode ? 'bg-slate-900 text-white' : 'bg-[#F5F5F5] text-black'}`}>
@@ -2123,6 +2366,22 @@ export default function BuildingForm() {
           </button>
         )}
       </div>
+
+      {(syncing || (syncTotal > 0 && syncProcessed > 0)) && (
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
+          <div className="flex items-center justify-between text-[10px] font-black uppercase">
+            <span className="text-[#001F3F]">Sync Progress</span>
+            <span className="text-slate-600">{syncProcessed}/{syncTotal} ({syncPercentage}%)</span>
+          </div>
+          <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+            <div className="h-full bg-[#85144B] transition-all duration-300" style={{ width: `${syncPercentage}%` }} />
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-slate-600 font-bold">
+            <span>{syncCurrentBuildingId ? `Now: ${syncCurrentBuildingId}` : 'Waiting...'}</span>
+            <span>{syncRatePerMinute} reports/min</span>
+          </div>
+        </div>
+      )}
 
       <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
@@ -2783,10 +3042,7 @@ export default function BuildingForm() {
                               type="text" 
                               readOnly
                               className="w-full p-3 bg-slate-100 rounded-xl font-bold text-sm border-2 border-[#AAAAAA] text-[#111111] cursor-not-allowed"
-                              value={formData[f.label] || (() => {
-                                const today = new Date();
-                                return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-                              })()}
+                              value={formData[f.label] || ''}
                             />
                           ) : (
                             <input 
@@ -2847,7 +3103,7 @@ export default function BuildingForm() {
                           </div>
                         )}
 
-                        {f.type === 'image' && <ImageUpload label={f.label} value={formData[f.label] || []} onChange={(imgs) => setFormData({...formData, [f.label]: imgs})} />}
+                        {f.type === 'image' && <ImageUpload label={f.label} value={formData[f.label] || []} onChange={(imgs) => setFormData({...formData, [f.label]: imgs})} isOnline={isOnline} />}
                         
                         {f.type === 'gps' && (
                           <div className="flex gap-2">
@@ -2872,6 +3128,18 @@ export default function BuildingForm() {
                 </div>
               </div>
             ))}
+
+            {!isAdmin && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSurveyTab('typology')}
+                  className="w-full bg-[#001F3F] text-[#39CCCC] font-black py-4 rounded-2xl shadow-lg hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs"
+                >
+                  <ArrowRight size={18} /> NEXT SECTION: BUILDING TYPOLOGY
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -3008,7 +3276,7 @@ export default function BuildingForm() {
 
           {/* New Survey / Keyboard Shortcuts */}
           <div className="space-y-3 mb-4">
-            {surveyorName && Object.keys(formData).length > 0 && (
+            {surveyorName && showPostSubmitNewSurvey && (
               <button 
                 onClick={startNewSurvey}
                 className="w-full bg-[#39CCCC] text-[#001F3F] font-black py-3 rounded-2xl shadow-lg hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs"
@@ -3046,9 +3314,11 @@ export default function BuildingForm() {
             </div>
           )}
 
-          <button onClick={submitReport} className="w-full bg-[#85144B] text-[#FFFFFF] font-black py-5 rounded-[2rem] shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs sticky bottom-4 z-10 border-4 border-white ring-2 ring-slate-100">
-            <CheckSquare size={18} /> {isOnline ? 'SUBMIT PROFORMA' : 'SAVE LOCALLY'}
-          </button>
+          {surveyTab === 'typology' && (
+            <button onClick={submitReport} className="w-full bg-[#85144B] text-[#FFFFFF] font-black py-5 rounded-[2rem] shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs sticky bottom-4 z-10 border-4 border-white ring-2 ring-slate-100">
+              <CheckSquare size={18} /> {isOnline ? 'SUBMIT PROFORMA' : 'SAVE LOCALLY'}
+            </button>
+          )}
         </>
       )}
 
@@ -3122,7 +3392,7 @@ export default function BuildingForm() {
                        <textarea placeholder="Add explanation or additional notes (optional)" className="w-full p-3 bg-slate-50 rounded-xl font-bold text-sm border-2 border-slate-300 text-black min-h-24 resize-none" value={editingReport.full_data[`${f.label}_comment`] || ''} onChange={(e) => handleEditChange(`${f.label}_comment`, e.target.value)} />
                     )}
                     {f.type === 'image' && (
-                       <ImageUpload label={f.label} value={editingReport.full_data[f.label] || []} onChange={(imgs) => handleEditChange(f.label, imgs)} />
+                       <ImageUpload label={f.label} value={editingReport.full_data[f.label] || []} onChange={(imgs) => handleEditChange(f.label, imgs)} isOnline={isOnline} />
                     )}
                     {f.type === 'gps' && <input type="text" className="w-full p-3 bg-slate-100 font-mono text-xs border text-black" value={editingReport.full_data[f.label] || ''} readOnly />}
                   </div>
