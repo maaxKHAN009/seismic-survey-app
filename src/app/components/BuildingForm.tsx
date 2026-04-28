@@ -1620,13 +1620,18 @@ export default function BuildingForm() {
   };
 
   const getSurveyorScopedReports = () => {
-    const normalizedSurveyorName = surveyorName.trim().toLowerCase();
+    const normalizeKey = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizedSurveyorName = normalizeKey(surveyorName);
     if (!normalizedSurveyorName) return [] as BuildingReport[];
 
     return reports.filter(r => {
-      const bySurveyorField = String(r.full_data?.['Surveyor Name'] || '').trim().toLowerCase();
+      const surveyorFieldRaw = String(r.full_data?.['Surveyor Name'] || '');
+      const bySurveyorField = normalizeKey(surveyorFieldRaw);
       if (bySurveyorField) return bySurveyorField === normalizedSurveyorName;
-      return r.building_id.toLowerCase().startsWith(`${normalizedSurveyorName}-`);
+
+      const buildingIdRaw = String(r.building_id || r.full_data?.['Building ID'] || '');
+      const normalizedBuildingId = normalizeKey(buildingIdRaw);
+      return normalizedBuildingId.startsWith(normalizedSurveyorName);
     });
   };
 
@@ -2116,7 +2121,7 @@ export default function BuildingForm() {
             const photos = Array.isArray(value) ? value as ImageObject[] : [];
             if (photos.length > 0) {
               const caption = photos.map((photo, idx) => (photo.label && photo.label.trim()) ? photo.label : `Photo ${idx + 1}`).join(' | ');
-              const targetUrl = photos.find(photo => photo.url)?.url;
+              const targetUrl = photos.find(photo => typeof photo.url === 'string' && /^https?:\/\//i.test(photo.url))?.url;
               if (targetUrl) {
                 cell.value = { text: caption, hyperlink: targetUrl };
                 cell.font = { color: { argb: 'FF1D4ED8' }, underline: true };
