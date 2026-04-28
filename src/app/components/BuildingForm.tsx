@@ -822,6 +822,7 @@ export default function BuildingForm() {
   const [syncFailed, setSyncFailed] = useState(0);
   const [syncCurrentBuildingId, setSyncCurrentBuildingId] = useState('');
   const [syncStartedAt, setSyncStartedAt] = useState<number | null>(null);
+  const [syncImageStatus, setSyncImageStatus] = useState('');
 
   const saveDraft = async (draftSource: Record<string, any>) => {
     if (Object.keys(draftSource).length === 0) return;
@@ -1630,6 +1631,42 @@ export default function BuildingForm() {
     await exportToExcel(selectedReportsData);
     setBatchSelectedReports(new Set());
   };
+
+  const requestPresignedUrl = async (contentType: string, fileName?: string) => {
+    const res = await fetch('/api/upload/presigned', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contentType,
+        fileName: fileName || `offline-${Date.now()}.jpg`
+      })
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Presigned URL failed: ${res.status} ${errorText}`);
+    }
+
+    return res.json() as Promise<{ uploadUrl: string; publicUrl: string }>;
+  };
+
+  const uploadBlobToR2 = async (blob: Blob, label: string) => {
+    const contentType = blob.type || 'image/jpeg';
+    const { uploadUrl, publicUrl } = await requestPresignedUrl(contentType, `${label}-${Date.now()}.jpg`);
+
+    const putRes = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': contentType },
+      body: blob
+    });
+
+    if (!putRes.ok) {
+      const errorText = await putRes.text();
+      throw new Error(`Upload failed: ${putRes.status} ${errorText}`);
+    }
+
+    return publicUrl;
+  };
   
   const runSync = async () => {
     if (!isOnline || syncing) return;
@@ -1654,20 +1691,30 @@ export default function BuildingForm() {
         setSyncCurrentBuildingId(report.building_id);
         try {
           const processedData = JSON.parse(JSON.stringify(report.full_data));
+          let totalLocalImages = 0;
+          let uploadedImageIndex = 0;
+
+          Object.values(processedData).forEach((val: any) => {
+            if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') {
+              totalLocalImages += val.filter((img: ImageObject) => img?.isLocal).length;
+            }
+          });
+
           for (const key in processedData) {
               const val = processedData[key];
               if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && val[0].isLocal) {
                   const uploadedImages: ImageObject[] = [];
                   for (const img of val) {
                       if (img.isLocal) {
+                          uploadedImageIndex += 1;
+                          setSyncImageStatus(`Uploading image ${uploadedImageIndex} of ${totalLocalImages}...`);
+
                           const res = await fetch(img.url);
                           const blob = await res.blob();
-                          const uploadFormData = new FormData();
-                          const file = new File([blob], `offline-${Date.now()}.jpg`, { type: "image/jpeg" });
-                          uploadFormData.append('file', file);
-                          const uploadRes = await fetch('/api/upload', { method: 'POST', body: uploadFormData });
-                          const uploadData = await uploadRes.json();
-                          if (uploadData.url) uploadedImages.push({ url: uploadData.url, label: img.label, isLocal: false });
+                          const safeLabel = img.label ? img.label.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 24) : 'offline';
+                          const publicUrl = await uploadBlobToR2(blob, safeLabel || 'offline');
+
+                          uploadedImages.push({ url: publicUrl, label: img.label, isLocal: false });
                       } else { uploadedImages.push(img); }
                   }
                   processedData[key] = uploadedImages;
@@ -1694,6 +1741,7 @@ export default function BuildingForm() {
     } finally {
       setSyncing(false);
       setSyncCurrentBuildingId('');
+      setSyncImageStatus('');
     }
   };
 
@@ -2477,6 +2525,11 @@ export default function BuildingForm() {
             <span>{syncCurrentBuildingId ? `Now: ${syncCurrentBuildingId}` : 'Waiting...'}</span>
             <span>{syncRatePerMinute} reports/min</span>
           </div>
+          {syncImageStatus && (
+            <div className="text-[10px] text-[#85144B] font-black">
+              {syncImageStatus}
+            </div>
+          )}
         </div>
       )}
 
