@@ -541,6 +541,43 @@ const getTodayDateDisplay = () => {
   return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
 };
 
+const requestPresignedUrl = async (contentType: string, fileName?: string) => {
+  const res = await fetch('/api/upload/presigned', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contentType,
+      fileName: fileName || `offline-${Date.now()}.jpg`
+    })
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Presigned URL failed: ${res.status} ${errorText}`);
+  }
+
+  return res.json() as Promise<{ uploadUrl: string; publicUrl: string }>;
+};
+
+const uploadBlobToR2 = async (blob: Blob, label: string, fileName?: string) => {
+  const contentType = blob.type || 'image/jpeg';
+  const safeName = fileName || `${label}-${Date.now()}.jpg`;
+  const { uploadUrl, publicUrl } = await requestPresignedUrl(contentType, safeName);
+
+  const putRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: blob
+  });
+
+  if (!putRes.ok) {
+    const errorText = await putRes.text();
+    throw new Error(`Upload failed: ${putRes.status} ${errorText}`);
+  }
+
+  return publicUrl;
+};
+
 // ==========================================
 // 2. SUB-COMPONENTS
 // ==========================================
@@ -574,34 +611,24 @@ const ImageUpload = ({ label, value, onChange, isOnline }: { label: string, valu
     setUploading(true);
     const newItems = [...value];
 
-    // Process all files with Promise.all to wait for all uploads
-    const uploadPromises = files.map(async (file) => {
+    for (const file of files) {
       if (navigator.onLine) {
-        const formData = new FormData();
-        formData.append('file', file);
         try {
-          console.log('Starting R2 upload for:', file.name);
-          const res = await fetch('/api/upload', { method: 'POST', body: formData });
-          if (!res.ok) {
-            const error = await res.text();
-            console.error('Upload API error:', res.status, error);
-            throw new Error(`API Error: ${res.status}`);
-          }
-          const data = await res.json();
-          console.log('R2 upload successful, URL:', data.url);
-          newItems.push({ url: data.url, label: `Capture ${newItems.length + 1}`, isLocal: false });
+          console.log('Starting presigned upload for:', file.name);
+          const safeLabel = file.name.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 24) || 'capture';
+          const publicUrl = await uploadBlobToR2(file, safeLabel, file.name);
+          console.log('Presigned upload successful, URL:', publicUrl);
+          newItems.push({ url: publicUrl, label: `Capture ${newItems.length + 1}`, isLocal: false });
         } catch (err) {
-          console.error('R2 upload failed, saving locally:', err);
+          console.error('Presigned upload failed, saving locally:', err);
           await saveLocally(file, newItems);
         }
       } else {
         console.log('Offline, saving locally:', file.name);
         await saveLocally(file, newItems);
       }
-    });
+    }
 
-    // Wait for all uploads to complete before updating state
-    await Promise.all(uploadPromises);
     onChange(newItems);
     setUploading(false);
   };
@@ -1630,42 +1657,6 @@ export default function BuildingForm() {
     const selectedReportsData = reports.filter(r => batchSelectedReports.has(r.id));
     await exportToExcel(selectedReportsData);
     setBatchSelectedReports(new Set());
-  };
-
-  const requestPresignedUrl = async (contentType: string, fileName?: string) => {
-    const res = await fetch('/api/upload/presigned', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contentType,
-        fileName: fileName || `offline-${Date.now()}.jpg`
-      })
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Presigned URL failed: ${res.status} ${errorText}`);
-    }
-
-    return res.json() as Promise<{ uploadUrl: string; publicUrl: string }>;
-  };
-
-  const uploadBlobToR2 = async (blob: Blob, label: string) => {
-    const contentType = blob.type || 'image/jpeg';
-    const { uploadUrl, publicUrl } = await requestPresignedUrl(contentType, `${label}-${Date.now()}.jpg`);
-
-    const putRes = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': contentType },
-      body: blob
-    });
-
-    if (!putRes.ok) {
-      const errorText = await putRes.text();
-      throw new Error(`Upload failed: ${putRes.status} ${errorText}`);
-    }
-
-    return publicUrl;
   };
   
   const runSync = async () => {
