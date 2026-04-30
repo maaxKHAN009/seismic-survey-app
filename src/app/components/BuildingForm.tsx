@@ -87,6 +87,13 @@ interface BuildingReport {
   full_data: Record<string, any>; 
 }
 
+interface OutboxEntry {
+  id?: number;
+  building_id: string;
+  full_data: Record<string, any>;
+  timestamp: number;
+}
+
 const DEFAULT_SECTIONS: Section[] = PROFORMA_SECTIONS as Section[];
 
 type TypologyFieldType = 'text' | 'number' | 'select';
@@ -559,23 +566,55 @@ const requestPresignedUrl = async (contentType: string, fileName?: string) => {
   return res.json() as Promise<{ uploadUrl: string; publicUrl: string }>;
 };
 
-const uploadBlobToR2 = async (blob: Blob, label: string, fileName?: string) => {
+const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number) => {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
+const uploadBlobToR2 = async (
+  blob: Blob,
+  label: string,
+  fileName?: string,
+  timeoutMs = 90000,
+  maxRetries = 3
+) => {
   const contentType = blob.type || 'image/jpeg';
   const safeName = fileName || `${label}-${Date.now()}.jpg`;
-  const { uploadUrl, publicUrl } = await requestPresignedUrl(contentType, safeName);
+  let lastError: Error | null = null;
 
-  const putRes = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: { 'Content-Type': contentType },
-    body: blob
-  });
+  for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
+    try {
+      const { uploadUrl, publicUrl } = await requestPresignedUrl(contentType, safeName);
 
-  if (!putRes.ok) {
-    const errorText = await putRes.text();
-    throw new Error(`Upload failed: ${putRes.status} ${errorText}`);
+      const putRes = await fetchWithTimeout(
+        uploadUrl,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': contentType },
+          body: blob
+        },
+        timeoutMs
+      );
+
+      if (!putRes.ok) {
+        const errorText = await putRes.text();
+        throw new Error(`Upload failed: ${putRes.status} ${errorText}`);
+      }
+
+      return publicUrl;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.warn(`Upload attempt ${attempt}/${maxRetries} failed`, lastError.message);
+    }
   }
 
-  return publicUrl;
+  throw lastError || new Error('Upload failed after retries');
 };
 
 // ==========================================
@@ -747,6 +786,7 @@ export default function BuildingForm() {
   const [isOnline, setIsOnline] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingReports, setPendingReports] = useState<OutboxEntry[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [locating, setLocating] = useState(false);
   
@@ -770,6 +810,10 @@ export default function BuildingForm() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [editingReport, setEditingReport] = useState<BuildingReport | null>(null);
+  const [editingReportTab, setEditingReportTab] = useState<'general' | 'typology'>('general');
+  const [adminTypologyWarned, setAdminTypologyWarned] = useState(false);
+  const [editingOutbox, setEditingOutbox] = useState<OutboxEntry | null>(null);
+  const [editingOutboxTab, setEditingOutboxTab] = useState<'general' | 'typology'>('general');
   const [viewingImages, setViewingImages] = useState<ImageObject[] | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
@@ -1060,7 +1104,9 @@ export default function BuildingForm() {
 
   const checkPending = async () => {
     if (localDB && localDB.outbox) {
-      setPendingCount(await localDB.outbox.count());
+      const pending = await localDB.outbox.toArray();
+      setPendingCount(pending.length);
+      setPendingReports(pending);
     }
   };
 
@@ -1443,6 +1489,13 @@ export default function BuildingForm() {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [formData]);
 
+  useEffect(() => {
+    if (editingReport) {
+      setEditingReportTab('general');
+      setAdminTypologyWarned(false);
+    }
+  }, [editingReport]);
+
   // NEW: Check if a field's dependency condition is satisfied
   const isConditionSatisfied = (field: CustomField, dataSource: Record<string, any> = formData): boolean => {
     if (!field.dependsOn) return true;
@@ -1703,7 +1756,10 @@ export default function BuildingForm() {
                   for (const img of val) {
                       if (img.isLocal) {
                           uploadedImageIndex += 1;
-                          setSyncImageStatus(`Uploading image ${uploadedImageIndex} of ${totalLocalImages}...`);
+                          const percent = totalLocalImages > 0
+                            ? Math.round((uploadedImageIndex / totalLocalImages) * 100)
+                            : 0;
+                          setSyncImageStatus(`Uploading photo ${uploadedImageIndex} of ${totalLocalImages}... (${percent}%)`);
 
                           const res = await fetch(img.url);
                           const blob = await res.blob();
@@ -2051,6 +2107,91 @@ export default function BuildingForm() {
       setEditingReport({ ...editingReport, full_data: { ...editingReport.full_data, [fieldLabel]: value } });
   };
 
+  const handleOutboxEditChange = (fieldLabel: string, value: any) => {
+    if (!editingOutbox) return;
+    setEditingOutbox({ ...editingOutbox, full_data: { ...editingOutbox.full_data, [fieldLabel]: value } });
+  };
+
+  const updateEditingReportTypologySelectedType = (selectedType: string) => {
+    if (!editingReport) return;
+    const current = getTypologyDataFromSource(editingReport.full_data);
+    const next: TypologySpecificData = {
+      selected_type: selectedType,
+      responses: selectedType === current.selected_type ? current.responses : {}
+    };
+    setEditingReport({
+      ...editingReport,
+      full_data: { ...editingReport.full_data, typology_specific_data: next }
+    });
+  };
+
+  const updateEditingReportTypologyResponse = (fieldId: string, value: any) => {
+    if (!editingReport) return;
+    const current = getTypologyDataFromSource(editingReport.full_data);
+    const next: TypologySpecificData = {
+      selected_type: current.selected_type,
+      responses: {
+        ...current.responses,
+        [fieldId]: value
+      }
+    };
+    setEditingReport({
+      ...editingReport,
+      full_data: { ...editingReport.full_data, typology_specific_data: next }
+    });
+  };
+
+  const updateOutboxTypologySelectedType = (selectedType: string) => {
+    if (!editingOutbox) return;
+    const current = getTypologyDataFromSource(editingOutbox.full_data);
+    const next: TypologySpecificData = {
+      selected_type: selectedType,
+      responses: selectedType === current.selected_type ? current.responses : {}
+    };
+    setEditingOutbox({
+      ...editingOutbox,
+      full_data: { ...editingOutbox.full_data, typology_specific_data: next }
+    });
+  };
+
+  const updateOutboxTypologyResponse = (fieldId: string, value: any) => {
+    if (!editingOutbox) return;
+    const current = getTypologyDataFromSource(editingOutbox.full_data);
+    const next: TypologySpecificData = {
+      selected_type: current.selected_type,
+      responses: {
+        ...current.responses,
+        [fieldId]: value
+      }
+    };
+    setEditingOutbox({
+      ...editingOutbox,
+      full_data: { ...editingOutbox.full_data, typology_specific_data: next }
+    });
+  };
+
+  const saveEditedOutboxReport = async () => {
+    if (!editingOutbox || !editingOutbox.id) return;
+
+    const nextBuildingId = editingOutbox.full_data?.['Building ID'] || editingOutbox.building_id;
+    await localDB.outbox.put({
+      ...editingOutbox,
+      building_id: nextBuildingId
+    });
+
+    setEditingOutbox(null);
+    setEditingOutboxTab('general');
+    await checkPending();
+    alert('Pending survey updated.');
+  };
+
+  const deleteOutboxReport = async (entryId?: number) => {
+    if (!entryId) return;
+    if (!window.confirm('Delete this pending survey? This cannot be undone.')) return;
+    await localDB.outbox.delete(entryId);
+    await checkPending();
+  };
+
   const exportToExcel = async (subset?: BuildingReport[]) => {
     const dataToExport = (subset || reports).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     if (dataToExport.length === 0) return alert('No data.');
@@ -2242,10 +2383,8 @@ export default function BuildingForm() {
       });
     });
 
-    addTransposedSheet('General Data', generalRows, dataToExport);
-
     TYPOLOGY_DEFINITIONS.forEach(def => {
-      const rows: TransposedRow[] = def.fields.map(field => ({
+      const typologyRows: TransposedRow[] = def.fields.map(field => ({
         section: def.label,
         question: field.label,
         getValue: (report) => {
@@ -2261,6 +2400,7 @@ export default function BuildingForm() {
         return parsed.selected_type === def.label;
       });
 
+      const rows: TransposedRow[] = [...generalRows, ...typologyRows];
       addTransposedSheet(def.sheetName, rows, typologyReports);
     });
 
@@ -2526,6 +2666,56 @@ export default function BuildingForm() {
               {syncImageStatus}
             </div>
           )}
+        </div>
+      )}
+
+      {pendingReports.length > 0 && (
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase text-[#001F3F]">Pending Surveys</p>
+              <p className="text-[9px] text-slate-500">Saved locally, not pushed yet</p>
+            </div>
+            {isOnlineForRender && (
+              <button
+                onClick={runSync}
+                disabled={syncing}
+                className="bg-[#85144B] text-white px-3 py-2 rounded-lg text-[10px] font-black flex items-center gap-2"
+              >
+                <RefreshCcw size={12} className={syncing ? 'animate-spin' : ''} /> PUSH ALL
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-48 overflow-y-auto border border-slate-100 rounded-lg">
+            {pendingReports.map((entry) => (
+              <div key={entry.id} className="flex items-center justify-between gap-3 p-3 border-b text-xs">
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-black truncate">{entry.building_id}</p>
+                  <p className="text-[10px] text-slate-500">Saved: {new Date(entry.timestamp).toLocaleString()}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingOutbox(entry);
+                      setEditingOutboxTab('general');
+                    }}
+                    className="text-[#001F3F]"
+                    title="Edit pending survey"
+                  >
+                    <Edit3 size={14} />
+                  </button>
+                  <button
+                    onClick={() => deleteOutboxReport(entry.id)}
+                    className="text-red-500"
+                    title="Delete pending survey"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -3482,59 +3672,374 @@ export default function BuildingForm() {
               <h3 className="font-black text-lg text-[#001F3F]">FULL DATA EDITOR</h3>
               <button onClick={() => setEditingReport(null)}><X /></button>
             </div>
+
+            {isAdmin && (
+              <div className="flex gap-2 bg-slate-100 p-2 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setEditingReportTab('general')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black uppercase ${editingReportTab === 'general' ? 'bg-[#001F3F] text-[#39CCCC]' : 'bg-white text-slate-600'}`}
+                >
+                  General
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!adminTypologyWarned) {
+                      const confirmEdit = window.confirm('Warning: You are about to edit typology data. These changes affect structural classification. Continue?');
+                      if (!confirmEdit) return;
+                      setAdminTypologyWarned(true);
+                    }
+                    setEditingReportTab('typology');
+                  }}
+                  className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black uppercase ${editingReportTab === 'typology' ? 'bg-[#85144B] text-white' : 'bg-white text-slate-600'}`}
+                >
+                  Typology
+                </button>
+              </div>
+            )}
             
-            {sections.map(sec => (
-              <div key={sec.id} className="space-y-3 border-b pb-4">
-                <h4 className="text-xs font-black text-[#85144B] uppercase tracking-widest">{sec.title}</h4>
-                {sec.fields.map(f => (
-                  <div key={f.id} className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase text-slate-900">{f.label}</label>
-                    {f.type === 'text' && <input type="text" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
-                    {f.type === 'date' && <input type="date" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
-                    {f.type === 'number' && <input type="number" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
-                    {f.type === 'select' && (
-                       <select className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)}>
-                          <option value="">Select...</option>
-                          {f.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                       </select>
-                    )}
-                    {f.type === 'multi_select' && (
-                        <MultiSelect options={f.options || []} value={editingReport.full_data[f.label] || []} onChange={(val) => handleEditChange(f.label, val)} />
-                    )}
-                    {f.type === 'dynamic_series' && (
-                        <DynamicSeries value={editingReport.full_data[f.label] || []} onChange={(val) => handleEditChange(f.label, val)} darkModeProp={darkMode} />
-                    )}
-                    {f.type === 'group' && f.subFields && (
-                       <div className="grid grid-cols-2 gap-2 bg-slate-100 p-2 rounded">
-                          {f.subFields.map(sub => (
-                             <div key={sub.id}>
+            {(!isAdmin || editingReportTab === 'general') && (
+              <>
+                {sections.map(sec => (
+                  <div key={sec.id} className="space-y-3 border-b pb-4">
+                    <h4 className="text-xs font-black text-[#85144B] uppercase tracking-widest">{sec.title}</h4>
+                    {sec.fields.map(f => (
+                      <div key={f.id} className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase text-slate-900">{f.label}</label>
+                        {f.type === 'text' && <input type="text" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
+                        {f.type === 'date' && <input type="date" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
+                        {f.type === 'number' && <input type="number" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)} />}
+                        {f.type === 'select' && (
+                          <select className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingReport.full_data[f.label] || ''} onChange={(e) => handleEditChange(f.label, e.target.value)}>
+                            <option value="">Select...</option>
+                            {f.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        )}
+                        {f.type === 'multi_select' && (
+                          <MultiSelect options={f.options || []} value={editingReport.full_data[f.label] || []} onChange={(val) => handleEditChange(f.label, val)} />
+                        )}
+                        {f.type === 'dynamic_series' && (
+                          <DynamicSeries value={editingReport.full_data[f.label] || []} onChange={(val) => handleEditChange(f.label, val)} darkModeProp={darkMode} />
+                        )}
+                        {f.type === 'group' && f.subFields && (
+                          <div className="grid grid-cols-2 gap-2 bg-slate-100 p-2 rounded">
+                            {f.subFields.map(sub => (
+                              <div key={sub.id}>
                                 <p className="text-[9px] font-bold text-black">{sub.label}</p>
                                 <input type="text" className="w-full p-2 bg-white rounded border text-black" 
-                                    value={editingReport.full_data[`${f.label} [${sub.label}]`] || ''} 
-                                    onChange={(e) => handleEditChange(`${f.label} [${sub.label}]`, e.target.value)} />
-                             </div>
-                          ))}
-                       </div>
-                    )}
-                    {f.type === 'checkbox' && (
-                       <div className="flex items-center gap-2">
-                         <input type="checkbox" className="w-5 h-5 accent-[#85144B]" checked={!!editingReport.full_data[f.label]} onChange={(e) => handleEditChange(f.label, e.target.checked)} />
-                         <span className="text-xs font-bold text-black">Verified</span>
-                       </div>
-                    )}
-                    {f.allowComments && (
-                       <textarea placeholder="Add explanation or additional notes (optional)" className="w-full p-3 bg-slate-50 rounded-xl font-bold text-sm border-2 border-slate-300 text-black min-h-24 resize-none" value={editingReport.full_data[`${f.label}_comment`] || ''} onChange={(e) => handleEditChange(`${f.label}_comment`, e.target.value)} />
-                    )}
-                    {f.type === 'image' && (
-                        <ImageUpload label={f.label} value={editingReport.full_data[f.label] || []} onChange={(imgs) => handleEditChange(f.label, imgs)} isOnline={isOnlineForRender} />
-                    )}
-                    {f.type === 'gps' && <input type="text" className="w-full p-3 bg-slate-100 font-mono text-xs border text-black" value={editingReport.full_data[f.label] || ''} readOnly />}
+                                  value={editingReport.full_data[`${f.label} [${sub.label}]`] || ''} 
+                                  onChange={(e) => handleEditChange(`${f.label} [${sub.label}]`, e.target.value)} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {f.type === 'checkbox' && (
+                          <div className="flex items-center gap-2">
+                            <input type="checkbox" className="w-5 h-5 accent-[#85144B]" checked={!!editingReport.full_data[f.label]} onChange={(e) => handleEditChange(f.label, e.target.checked)} />
+                            <span className="text-xs font-bold text-black">Verified</span>
+                          </div>
+                        )}
+                        {f.allowComments && (
+                          <textarea placeholder="Add explanation or additional notes (optional)" className="w-full p-3 bg-slate-50 rounded-xl font-bold text-sm border-2 border-slate-300 text-black min-h-24 resize-none" value={editingReport.full_data[`${f.label}_comment`] || ''} onChange={(e) => handleEditChange(`${f.label}_comment`, e.target.value)} />
+                        )}
+                        {f.type === 'image' && (
+                          <ImageUpload label={f.label} value={editingReport.full_data[f.label] || []} onChange={(imgs) => handleEditChange(f.label, imgs)} isOnline={isOnlineForRender} />
+                        )}
+                        {f.type === 'gps' && <input type="text" className="w-full p-3 bg-slate-100 font-mono text-xs border text-black" value={editingReport.full_data[f.label] || ''} readOnly />}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </>
+            )}
+
+            {isAdmin && editingReportTab === 'typology' && (() => {
+              const typologyData = getTypologyDataFromSource(editingReport.full_data);
+              const selectedDefinition = typologyData.selected_type ? TYPOLOGY_DEFINITION_MAP[typologyData.selected_type] : undefined;
+
+              return (
+                <div className="space-y-4">
+                  <div className="rounded-2xl border-2 border-red-200 bg-red-50 p-4">
+                    <p className="text-[10px] font-black text-red-700 uppercase">Warning</p>
+                    <p className="text-xs font-bold text-red-800">You are editing typology data. These changes affect structural classification.</p>
+                  </div>
+
+                  <div className="bg-slate-50 p-4 rounded-xl border">
+                    <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">Typology Selection</label>
+                    <div className="relative mt-2">
+                      <select
+                        className="w-full p-3 bg-white rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] appearance-none text-[#111111] outline-none"
+                        value={typologyData.selected_type || ''}
+                        onChange={(e) => updateEditingReportTypologySelectedType(e.target.value)}
+                      >
+                        <option value="">Select...</option>
+                        {TYPOLOGY_DEFINITIONS.map(def => (
+                          <option key={def.label} value={def.label}>{def.label}</option>
+                        ))}
+                      </select>
+                      <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-[#AAAAAA]" size={20} />
+                    </div>
+                  </div>
+
+                  {selectedDefinition && (
+                    <div className="grid grid-cols-1 gap-4">
+                      {selectedDefinition.fields.map(field => {
+                        if (!isTypologyFieldVisible(field, typologyData.responses || {})) return null;
+
+                        const group = TYPOLOGY_FIELD_GROUP_BY_ID[field.id];
+                        if (group) {
+                          const visibleMemberFields = selectedDefinition.fields.filter(
+                            member => group.fieldIds.includes(member.id) && isTypologyFieldVisible(member, typologyData.responses || {})
+                          );
+                          if (visibleMemberFields.length === 0) return null;
+
+                          const minimumVisibleCount = group.minVisibleCountToRenderGroup || 1;
+                          if (visibleMemberFields.length >= minimumVisibleCount) {
+                            if (visibleMemberFields[0].id !== field.id) return null;
+
+                            return (
+                              <div key={group.id}>
+                                <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">{group.label}</label>
+                                <div className={`grid gap-3 mt-1 ${visibleMemberFields.length === 3 ? 'grid-cols-3' : visibleMemberFields.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                  {visibleMemberFields.map(memberField => (
+                                    <div key={memberField.id} className="min-w-0">
+                                      <label className="text-[10px] font-black uppercase text-[#111111]">{group.subLabels[memberField.id] || memberField.label}</label>
+                                      <input
+                                        type="number"
+                                        className="w-full mt-1 p-3 bg-white rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]"
+                                        placeholder="..."
+                                        value={typologyData.responses?.[memberField.id] || ''}
+                                        onChange={(e) => updateEditingReportTypologyResponse(memberField.id, e.target.value)}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          }
+                        }
+
+                        return (
+                          <div key={field.id}>
+                            <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">{field.label}</label>
+                            {field.type === 'select' ? (
+                              <div className="relative mt-1">
+                                <select
+                                  className="w-full p-3 bg-white rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] appearance-none text-[#111111] outline-none"
+                                  value={typologyData.responses?.[field.id] || ''}
+                                  onChange={(e) => updateEditingReportTypologyResponse(field.id, e.target.value)}
+                                >
+                                  <option value="">Select...</option>
+                                  {(field.options || []).map(option => (
+                                    <option key={option} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                                <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-[#AAAAAA]" size={20} />
+                              </div>
+                            ) : (
+                              <input
+                                type={field.type === 'number' ? 'number' : 'text'}
+                                className="w-full mt-1 p-3 bg-white rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]"
+                                placeholder="..."
+                                value={typologyData.responses?.[field.id] || ''}
+                                onChange={(e) => updateEditingReportTypologyResponse(field.id, e.target.value)}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            <button onClick={saveEditedReport} className="w-full bg-[#001F3F] text-[#39CCCC] py-4 rounded-xl font-black uppercase text-sm sticky bottom-0 shadow-xl">SAVE ALL CHANGES</button>
+          </div>
+        </div>
+      )}
+
+      {editingOutbox && (
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b pb-2">
+              <h3 className="font-black text-lg text-[#001F3F]">PENDING SURVEY EDITOR</h3>
+              <button onClick={() => { setEditingOutbox(null); setEditingOutboxTab('general'); }}><X /></button>
+            </div>
+
+            <div className="flex gap-2 bg-slate-100 p-2 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setEditingOutboxTab('general')}
+                className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black uppercase ${editingOutboxTab === 'general' ? 'bg-[#001F3F] text-[#39CCCC]' : 'bg-white text-slate-600'}`}
+              >
+                General
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingOutboxTab('typology')}
+                className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black uppercase ${editingOutboxTab === 'typology' ? 'bg-[#85144B] text-white' : 'bg-white text-slate-600'}`}
+              >
+                Typology
+              </button>
+            </div>
+
+            {editingOutboxTab === 'general' && (
+              <div className="space-y-4">
+                {sections.map(sec => (
+                  <div key={sec.id} className="space-y-3 border-b pb-4">
+                    <h4 className="text-xs font-black text-[#85144B] uppercase tracking-widest">{sec.title}</h4>
+                    {sec.fields.map(f => (
+                      <div key={f.id} className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase text-slate-900">{f.label}</label>
+                        {f.type === 'text' && <input type="text" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingOutbox.full_data[f.label] || ''} onChange={(e) => handleOutboxEditChange(f.label, e.target.value)} />}
+                        {f.type === 'date' && <input type="date" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingOutbox.full_data[f.label] || ''} onChange={(e) => handleOutboxEditChange(f.label, e.target.value)} />}
+                        {f.type === 'number' && <input type="number" className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingOutbox.full_data[f.label] || ''} onChange={(e) => handleOutboxEditChange(f.label, e.target.value)} />}
+                        {f.type === 'select' && (
+                          <select className="w-full p-3 bg-slate-50 rounded-xl font-bold border text-black" value={editingOutbox.full_data[f.label] || ''} onChange={(e) => handleOutboxEditChange(f.label, e.target.value)}>
+                            <option value="">Select...</option>
+                            {f.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        )}
+                        {f.type === 'multi_select' && (
+                          <MultiSelect options={f.options || []} value={editingOutbox.full_data[f.label] || []} onChange={(val) => handleOutboxEditChange(f.label, val)} />
+                        )}
+                        {f.type === 'dynamic_series' && (
+                          <DynamicSeries value={editingOutbox.full_data[f.label] || []} onChange={(val) => handleOutboxEditChange(f.label, val)} darkModeProp={darkMode} />
+                        )}
+                        {f.type === 'group' && f.subFields && (
+                          <div className="grid grid-cols-2 gap-2 bg-slate-100 p-2 rounded">
+                            {f.subFields.map(sub => (
+                              <div key={sub.id}>
+                                <p className="text-[9px] font-bold text-black">{sub.label}</p>
+                                <input type="text" className="w-full p-2 bg-white rounded border text-black" 
+                                  value={editingOutbox.full_data[`${f.label} [${sub.label}]`] || ''} 
+                                  onChange={(e) => handleOutboxEditChange(`${f.label} [${sub.label}]`, e.target.value)} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {f.type === 'checkbox' && (
+                          <div className="flex items-center gap-2">
+                            <input type="checkbox" className="w-5 h-5 accent-[#85144B]" checked={!!editingOutbox.full_data[f.label]} onChange={(e) => handleOutboxEditChange(f.label, e.target.checked)} />
+                            <span className="text-xs font-bold text-black">Verified</span>
+                          </div>
+                        )}
+                        {f.allowComments && (
+                          <textarea placeholder="Add explanation or additional notes (optional)" className="w-full p-3 bg-slate-50 rounded-xl font-bold text-sm border-2 border-slate-300 text-black min-h-24 resize-none" value={editingOutbox.full_data[`${f.label}_comment`] || ''} onChange={(e) => handleOutboxEditChange(`${f.label}_comment`, e.target.value)} />
+                        )}
+                        {f.type === 'image' && (
+                          <ImageUpload label={f.label} value={editingOutbox.full_data[f.label] || []} onChange={(imgs) => handleOutboxEditChange(f.label, imgs)} isOnline={isOnlineForRender} />
+                        )}
+                        {f.type === 'gps' && <input type="text" className="w-full p-3 bg-slate-100 font-mono text-xs border text-black" value={editingOutbox.full_data[f.label] || ''} readOnly />}
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
-            ))}
+            )}
 
-            <button onClick={saveEditedReport} className="w-full bg-[#001F3F] text-[#39CCCC] py-4 rounded-xl font-black uppercase text-sm sticky bottom-0 shadow-xl">SAVE ALL CHANGES</button>
+            {editingOutboxTab === 'typology' && (() => {
+              const typologyData = getTypologyDataFromSource(editingOutbox.full_data);
+              const selectedDefinition = typologyData.selected_type ? TYPOLOGY_DEFINITION_MAP[typologyData.selected_type] : undefined;
+
+              return (
+                <div className="space-y-4">
+                  <div className="bg-slate-50 p-4 rounded-xl border">
+                    <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">Typology Selection</label>
+                    <div className="relative mt-2">
+                      <select
+                        className="w-full p-3 bg-white rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] appearance-none text-[#111111] outline-none"
+                        value={typologyData.selected_type || ''}
+                        onChange={(e) => updateOutboxTypologySelectedType(e.target.value)}
+                      >
+                        <option value="">Select...</option>
+                        {TYPOLOGY_DEFINITIONS.map(def => (
+                          <option key={def.label} value={def.label}>{def.label}</option>
+                        ))}
+                      </select>
+                      <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-[#AAAAAA]" size={20} />
+                    </div>
+                  </div>
+
+                  {selectedDefinition && (
+                    <div className="grid grid-cols-1 gap-4">
+                      {selectedDefinition.fields.map(field => {
+                        if (!isTypologyFieldVisible(field, typologyData.responses || {})) return null;
+
+                        const group = TYPOLOGY_FIELD_GROUP_BY_ID[field.id];
+                        if (group) {
+                          const visibleMemberFields = selectedDefinition.fields.filter(
+                            member => group.fieldIds.includes(member.id) && isTypologyFieldVisible(member, typologyData.responses || {})
+                          );
+                          if (visibleMemberFields.length === 0) return null;
+
+                          const minimumVisibleCount = group.minVisibleCountToRenderGroup || 1;
+                          if (visibleMemberFields.length >= minimumVisibleCount) {
+                            if (visibleMemberFields[0].id !== field.id) return null;
+
+                            return (
+                              <div key={group.id}>
+                                <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">{group.label}</label>
+                                <div className={`grid gap-3 mt-1 ${visibleMemberFields.length === 3 ? 'grid-cols-3' : visibleMemberFields.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                  {visibleMemberFields.map(memberField => (
+                                    <div key={memberField.id} className="min-w-0">
+                                      <label className="text-[10px] font-black uppercase text-[#111111]">{group.subLabels[memberField.id] || memberField.label}</label>
+                                      <input
+                                        type="number"
+                                        className="w-full mt-1 p-3 bg-white rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]"
+                                        placeholder="..."
+                                        value={typologyData.responses?.[memberField.id] || ''}
+                                        onChange={(e) => updateOutboxTypologyResponse(memberField.id, e.target.value)}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          }
+                        }
+
+                        return (
+                          <div key={field.id}>
+                            <label className="text-[10px] sm:text-xs font-black uppercase text-[#111111]">{field.label}</label>
+                            {field.type === 'select' ? (
+                              <div className="relative mt-1">
+                                <select
+                                  className="w-full p-3 bg-white rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] appearance-none text-[#111111] outline-none"
+                                  value={typologyData.responses?.[field.id] || ''}
+                                  onChange={(e) => updateOutboxTypologyResponse(field.id, e.target.value)}
+                                >
+                                  <option value="">Select...</option>
+                                  {(field.options || []).map(option => (
+                                    <option key={option} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                                <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-[#AAAAAA]" size={20} />
+                              </div>
+                            ) : (
+                              <input
+                                type={field.type === 'number' ? 'number' : 'text'}
+                                className="w-full mt-1 p-3 bg-white rounded-xl font-bold text-sm border-2 border-[#AAAAAA] focus:border-[#85144B] outline-none text-[#111111]"
+                                placeholder="..."
+                                value={typologyData.responses?.[field.id] || ''}
+                                onChange={(e) => updateOutboxTypologyResponse(field.id, e.target.value)}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div className="flex gap-2">
+              <button onClick={saveEditedOutboxReport} className="flex-1 bg-[#001F3F] text-[#39CCCC] py-4 rounded-xl font-black uppercase text-sm">SAVE CHANGES</button>
+              <button onClick={() => deleteOutboxReport(editingOutbox.id)} className="px-4 py-4 rounded-xl font-black text-sm bg-red-100 text-red-600">DELETE</button>
+            </div>
           </div>
         </div>
       )}
