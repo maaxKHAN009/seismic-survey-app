@@ -1365,7 +1365,10 @@ export default function BuildingForm() {
     if (!('serviceWorker' in navigator)) return;
 
     const intervalId = window.setInterval(() => {
-      swRegistrationRef.current?.update();
+      if (!navigator.onLine) return;
+      swRegistrationRef.current?.update().catch((err) => {
+        console.warn('Service worker update failed', err);
+      });
     }, 60 * 1000);
 
     return () => window.clearInterval(intervalId);
