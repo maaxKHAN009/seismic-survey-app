@@ -894,6 +894,9 @@ export default function BuildingForm() {
   const [syncCurrentBuildingId, setSyncCurrentBuildingId] = useState('');
   const [syncStartedAt, setSyncStartedAt] = useState<number | null>(null);
   const [syncImageStatus, setSyncImageStatus] = useState('');
+  const [syncSurveyIndex, setSyncSurveyIndex] = useState(0);
+  const [clientErrors, setClientErrors] = useState<Array<{ id: string; source: string; message: string; stack?: string; time: string }>>([]);
+  const [showClientErrors, setShowClientErrors] = useState(false);
 
   const saveDraft = async (draftSource: Record<string, any>) => {
     if (Object.keys(draftSource).length === 0) return;
@@ -934,6 +937,47 @@ export default function BuildingForm() {
       await localDB.drafts.delete(ACTIVE_DRAFT_ID);
     } catch {
       // Ignore Dexie cleanup errors.
+    }
+  };
+
+  const formatConsoleArg = (arg: any): string => {
+    if (arg instanceof Error) {
+      return `${arg.name}: ${arg.message}${arg.stack ? `\n${arg.stack}` : ''}`;
+    }
+    if (typeof arg === 'string') return arg;
+    try {
+      return JSON.stringify(arg);
+    } catch {
+      return String(arg);
+    }
+  };
+
+  const addClientError = (source: string, message: string, stack?: string) => {
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      source,
+      message,
+      stack,
+      time: new Date().toISOString()
+    };
+    setClientErrors(prev => [entry, ...prev].slice(0, 50));
+  };
+
+  const copyClientErrors = async () => {
+    const payload = clientErrors.map(err => {
+      const lines = [
+        `[${err.time}] ${err.source}`,
+        err.message
+      ];
+      if (err.stack) lines.push(err.stack);
+      return lines.join('\n');
+    }).join('\n\n');
+
+    try {
+      await navigator.clipboard.writeText(payload);
+      alert('Error log copied to clipboard.');
+    } catch {
+      alert('Copy failed. Please take a screenshot of the error log.');
     }
   };
 
@@ -1177,6 +1221,40 @@ export default function BuildingForm() {
 
   useEffect(() => {
     setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const originalConsoleError = console.error;
+
+    console.error = (...args: any[]) => {
+      originalConsoleError(...args);
+      const message = args.map(formatConsoleArg).join(' ');
+      addClientError('console.error', message);
+    };
+
+    const handleWindowError = (event: ErrorEvent) => {
+      const message = event.message || 'Unhandled error';
+      const stack = event.error?.stack;
+      addClientError('window.error', message, stack);
+    };
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      if (reason instanceof Error) {
+        addClientError('unhandledrejection', `${reason.name}: ${reason.message}`, reason.stack);
+      } else {
+        addClientError('unhandledrejection', formatConsoleArg(reason));
+      }
+    };
+
+    window.addEventListener('error', handleWindowError);
+    window.addEventListener('unhandledrejection', handleRejection);
+
+    return () => {
+      console.error = originalConsoleError;
+      window.removeEventListener('error', handleWindowError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
   }, []);
 
   useEffect(() => {
@@ -1721,25 +1799,37 @@ export default function BuildingForm() {
     if (!isOnline || syncing) return;
     setSyncing(true);
     try {
-      const pending = await localDB.outbox.toArray();
-      if (pending.length === 0) {
+      const totalPending = await localDB.outbox.count();
+      if (totalPending === 0) {
         alert('No pending surveys to sync.');
         return;
       }
 
-      setSyncTotal(pending.length);
+      setSyncTotal(totalPending);
       setSyncCompleted(0);
       setSyncFailed(0);
       setSyncCurrentBuildingId('');
       setSyncStartedAt(Date.now());
+      setSyncSurveyIndex(0);
 
       let successfulSyncs = 0;
       let failedSyncs = 0;
 
-      for (const report of pending) {
+      let lastProcessedId = 0;
+
+      while (true) {
+        const report = await localDB.outbox.where('id').above(lastProcessedId).first();
+        if (!report) break;
+
+        if (typeof report.id === 'number') {
+          lastProcessedId = report.id;
+        }
+
+        setSyncSurveyIndex(prev => prev + 1);
         setSyncCurrentBuildingId(report.building_id);
+
         try {
-          const processedData = JSON.parse(JSON.stringify(report.full_data));
+          const processedData = (JSON.parse(JSON.stringify(report.full_data)) || {}) as Record<string, any>;
           let totalLocalImages = 0;
           let uploadedImageIndex = 0;
 
@@ -1782,17 +1872,21 @@ export default function BuildingForm() {
         } catch {
           failedSyncs += 1;
           setSyncFailed(failedSyncs);
+        } finally {
+          // Explicitly drop references to large objects
+          report.full_data = {} as any;
         }
       }
 
       await checkPending();
       loadReports();
-      alert(`Sync complete. Uploaded ${successfulSyncs}/${pending.length}${failedSyncs > 0 ? `, Failed ${failedSyncs}` : ''}.`);
+      alert(`Sync complete. Uploaded ${successfulSyncs}/${totalPending}${failedSyncs > 0 ? `, Failed ${failedSyncs}` : ''}.`);
     } catch (e) {
       alert("Sync interrupted.");
     } finally {
       setSyncing(false);
       setSyncCurrentBuildingId('');
+      setSyncSurveyIndex(0);
       setSyncImageStatus('');
     }
   };
@@ -1943,6 +2037,42 @@ export default function BuildingForm() {
       },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
+  };
+
+  const formatGpsValue = (raw: string) => {
+    const cleaned = raw.trim();
+    if (!cleaned) return null;
+    const parts = cleaned.split(/[,\s]+/).filter(Boolean);
+    if (parts.length < 2) return null;
+
+    const lat = Number(parts[0]);
+    const lon = Number(parts[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+
+    return {
+      formatted: `${lat.toFixed(8)}, ${lon.toFixed(8)}`,
+      lat: lat.toFixed(8),
+      lon: lon.toFixed(8)
+    };
+  };
+
+  const updateGpsField = (label: string, raw: string, shouldFormat = false) => {
+    const formatted = shouldFormat ? formatGpsValue(raw) : null;
+    if (formatted) {
+      setFormData(prev => ({
+        ...prev,
+        [label]: formatted.formatted,
+        [`${label}_LATITUDE`]: formatted.lat,
+        [`${label}_LONGITUDE`]: formatted.lon
+      }));
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      [label]: raw
+    }));
   };
 
   const addSection = async () => {
@@ -2658,7 +2788,7 @@ export default function BuildingForm() {
             <div className="h-full bg-[#85144B] transition-all duration-300" style={{ width: `${syncPercentage}%` }} />
           </div>
           <div className="flex items-center justify-between text-[10px] text-slate-600 font-bold">
-            <span>{syncCurrentBuildingId ? `Now: ${syncCurrentBuildingId}` : 'Waiting...'}</span>
+            <span>{syncCurrentBuildingId ? `Syncing survey ${syncSurveyIndex} of ${syncTotal}: ${syncCurrentBuildingId}` : 'Waiting...'}</span>
             <span>{syncRatePerMinute} reports/min</span>
           </div>
           {syncImageStatus && (
@@ -3443,7 +3573,14 @@ export default function BuildingForm() {
                         
                         {f.type === 'gps' && (
                           <div className="flex gap-2">
-                            <input type="text" readOnly className="flex-1 p-3 bg-slate-100 rounded-xl font-mono text-xs border-2 text-black" value={formData[f.label] || 'Waiting for signal...'} />
+                            <input
+                              type="text"
+                              className="flex-1 p-3 bg-slate-100 rounded-xl font-mono text-xs border-2 text-black"
+                              placeholder="lat, lon"
+                              value={formData[f.label] || ''}
+                              onChange={(e) => updateGpsField(f.label, e.target.value)}
+                              onBlur={(e) => updateGpsField(f.label, e.target.value, true)}
+                            />
                             <button onClick={() => captureGPS(f.label)} className="bg-[#85144B] text-white p-3 rounded-xl hover:bg-[#600e35] flex items-center justify-center gap-2"><Loader2 className={locating ? "animate-spin" : "hidden"} size={18} /> <MapPin size={18} /></button>
                           </div>
                         )}
@@ -4120,6 +4257,80 @@ export default function BuildingForm() {
             >
               <RefreshCcw size={14} className={updatingApp ? 'animate-spin' : ''} /> {updatingApp ? 'Updating...' : 'Update'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {syncing && (
+        <div className="fixed inset-0 z-[205] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 shadow-2xl border-2 border-[#85144B] max-w-sm w-full text-center space-y-3">
+            <div className="text-xs font-black uppercase text-[#85144B]">Sync in progress</div>
+            <div className="text-sm font-bold text-[#001F3F]">Please keep the app open</div>
+            <div className="text-[11px] text-slate-600">
+              Syncing survey {syncSurveyIndex} of {syncTotal}
+            </div>
+            {syncImageStatus && (
+              <div className="text-[11px] font-bold text-[#85144B]">{syncImageStatus}</div>
+            )}
+            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+              <div className="h-full bg-[#85144B] transition-all duration-300" style={{ width: `${syncPercentage}%` }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {clientErrors.length > 0 && (
+        <div className="fixed bottom-5 right-5 z-[215]">
+          <button
+            type="button"
+            onClick={() => setShowClientErrors(true)}
+            className="bg-red-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg"
+          >
+            Errors ({clientErrors.length})
+          </button>
+        </div>
+      )}
+
+      {showClientErrors && (
+        <div className="fixed inset-0 z-[230] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-3xl p-6 shadow-2xl space-y-4 border-2 border-red-300">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <p className="text-xs font-black uppercase text-red-700">Error Log</p>
+                <p className="text-[10px] text-slate-500">Share this with support</p>
+              </div>
+              <button onClick={() => setShowClientErrors(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={copyClientErrors}
+                className="bg-[#001F3F] text-[#39CCCC] px-3 py-2 rounded-lg text-[10px] font-black uppercase"
+              >
+                Copy Log
+              </button>
+              <button
+                type="button"
+                onClick={() => setClientErrors([])}
+                className="bg-slate-100 text-slate-700 px-3 py-2 rounded-lg text-[10px] font-black uppercase"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="space-y-3">
+              {clientErrors.map(err => (
+                <div key={err.id} className="border border-red-200 rounded-xl p-3 bg-red-50">
+                  <div className="flex items-center justify-between text-[10px] font-bold text-red-800">
+                    <span>{err.source}</span>
+                    <span>{new Date(err.time).toLocaleString()}</span>
+                  </div>
+                  <pre className="mt-2 text-[10px] whitespace-pre-wrap text-red-900">
+                    {err.message}
+                    {err.stack ? `\n${err.stack}` : ''}
+                  </pre>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
