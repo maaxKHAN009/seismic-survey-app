@@ -981,6 +981,35 @@ export default function BuildingForm() {
     }
   };
 
+  const ensureMatchMediaSupport = () => {
+    if (typeof window === 'undefined') return;
+
+    const fallback = (query: string) => ({
+      matches: false,
+      media: query,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false
+    });
+
+    const originalMatchMedia = window.matchMedia?.bind(window);
+    (window as any).matchMedia = (query: string) => {
+      const result = originalMatchMedia ? originalMatchMedia(query) : null;
+      if (!result) return fallback(query) as any;
+      if (!(result as any).addListener && result.addEventListener) {
+        (result as any).addListener = (listener: EventListenerOrEventListenerObject) => {
+          result.addEventListener('change', listener);
+        };
+        (result as any).removeListener = (listener: EventListenerOrEventListenerObject) => {
+          result.removeEventListener('change', listener);
+        };
+      }
+      return result;
+    };
+  };
+
 
   // ========== HELPER FUNCTIONS FOR UI ENHANCEMENTS ==========
   const getFieldTypeColor = (type: FieldType): string => {
@@ -1224,6 +1253,7 @@ export default function BuildingForm() {
   }, []);
 
   useEffect(() => {
+    ensureMatchMediaSupport();
     const originalConsoleError = console.error;
 
     console.error = (...args: any[]) => {
