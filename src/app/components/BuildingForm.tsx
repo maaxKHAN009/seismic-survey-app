@@ -618,6 +618,41 @@ const uploadBlobToR2 = async (
 };
 
 // ==========================================
+// 1b. HEIC CONVERSION HELPER
+// ==========================================
+
+/**
+ * Converts a HEIC/HEIF file to JPEG in the browser using heic2any.
+ * If the file is not HEIC/HEIF, returns it unchanged.
+ */
+const convertHeicToJpeg = async (file: File): Promise<File> => {
+  const isHeic =
+    file.type === 'image/heic' ||
+    file.type === 'image/heif' ||
+    /\.hei[cf]$/i.test(file.name);
+
+  if (!isHeic) return file;
+
+  try {
+    // Dynamic import keeps heic2any out of the initial bundle (it's large)
+    const heic2any = (await import('heic2any')).default;
+    const converted = await heic2any({
+      blob: file,
+      toType: 'image/jpeg',
+      quality: 0.85,
+    });
+
+    // heic2any may return a single Blob or an array of Blobs (for multi-image HEIC)
+    const resultBlob = Array.isArray(converted) ? converted[0] : converted;
+    const newName = file.name.replace(/\.hei[cf]$/i, '.jpg');
+    return new File([resultBlob], newName, { type: 'image/jpeg' });
+  } catch (err) {
+    console.warn('HEIC conversion failed, using original file:', err);
+    return file;
+  }
+};
+
+// ==========================================
 // 2. SUB-COMPONENTS
 // ==========================================
 
@@ -645,12 +680,18 @@ const ImageUpload = ({ label, value, onChange, isOnline }: { label: string, valu
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+    const rawFiles = Array.from(e.target.files || []);
+    if (rawFiles.length === 0) return;
     setUploading(true);
     const newItems = [...value];
 
-    for (const file of files) {
+    for (const rawFile of rawFiles) {
+      // Convert HEIC/HEIF → JPEG before anything else
+      const file = await convertHeicToJpeg(rawFile);
+      if (file !== rawFile) {
+        console.log(`Converted HEIC → JPEG: ${rawFile.name} → ${file.name}`);
+      }
+
       if (navigator.onLine) {
         try {
           console.log('Starting presigned upload for:', file.name);
