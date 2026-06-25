@@ -622,18 +622,23 @@ const uploadBlobToR2 = async (
 // ==========================================
 
 /**
- * Converts a HEIC/HEIF file to JPEG in the browser.
+ * Converts a HEIC/HEIF file to JPEG using the browser's native canvas API.
  *
- * Strategy (in order):
- *  1. Native canvas conversion — uses createImageBitmap which works natively
- *     in iOS/macOS Safari (the OS has built-in HEIC support). Zero dependencies.
- *  2. heic2any fallback — for desktop browsers (Chrome, Firefox) that lack
- *     native HEIC support but can run the WASM-based library.
- *  3. Original file — if both fail, upload unchanged so the user isn't blocked.
+ * Uses createImageBitmap (natively supported on iOS/macOS Safari, which has
+ * built-in OS-level HEIC decoding) to draw the image onto a canvas and export
+ * it as JPEG. No third-party library is used.
  *
- * NOTE: heic2any's internal Web Worker crashes in Safari/WebKit with
- *   "Cannot read properties of undefined (reading 'addListener')"
- * which is why canvas is tried FIRST for iPhone users.
+ * WHY heic2any IS PERMANENTLY REMOVED:
+ *   heic2any spawns an internal Web Worker via a blob URL. When that worker
+ *   crashes in Safari/WebKit with:
+ *     "Cannot read properties of undefined (reading 'addListener')"
+ *   the error fires as window.onerror — completely outside the reach of any
+ *   try/catch in the main thread. There is no way to suppress it while keeping
+ *   the library. Canvas conversion covers all Apple devices natively, so
+ *   heic2any is simply not needed.
+ *
+ * If canvas conversion fails (very old browser), the original file is returned
+ * unchanged so the user is never blocked from completing the survey.
  */
 const convertHeicToJpeg = async (file: File): Promise<File> => {
   const isHeic =
@@ -645,8 +650,9 @@ const convertHeicToJpeg = async (file: File): Promise<File> => {
 
   const newName = file.name.replace(/\.hei[cf]$/i, '.jpg');
 
-  // ── Strategy 1: Native canvas (iOS Safari / macOS Safari) ──────────────────
   try {
+    // createImageBitmap decodes HEIC using the OS-level codec.
+    // Works natively on iOS 16+, macOS Safari, and modern Chromium.
     const bitmap = await createImageBitmap(file);
     const canvas = document.createElement('canvas');
     canvas.width = bitmap.width;
@@ -664,27 +670,13 @@ const convertHeicToJpeg = async (file: File): Promise<File> => {
       );
     });
 
-    console.log('HEIC converted via native canvas:', newName);
+    console.log('HEIC \u2192 JPEG converted via native canvas:', newName);
     return new File([blob], newName, { type: 'image/jpeg' });
-  } catch (canvasErr) {
-    console.warn('Native canvas HEIC conversion failed, trying heic2any:', canvasErr);
+  } catch (err) {
+    // Canvas path failed — upload original rather than blocking the user.
+    console.warn('HEIC canvas conversion failed, uploading original file:', err);
+    return file;
   }
-
-  // ── Strategy 2: heic2any WASM library (Chrome / Firefox on desktop) ────────
-  try {
-    // Dynamic import keeps this large library out of the initial bundle
-    const heic2any = (await import('heic2any')).default;
-    const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
-    // heic2any may return a Blob or Blob[] (burst/multi-image HEIC)
-    const resultBlob = Array.isArray(converted) ? converted[0] : converted;
-    console.log('HEIC converted via heic2any:', newName);
-    return new File([resultBlob], newName, { type: 'image/jpeg' });
-  } catch (heicErr) {
-    console.warn('heic2any conversion also failed, uploading original file:', heicErr);
-  }
-
-  // ── Strategy 3: Give up gracefully — upload original ───────────────────────
-  return file;
 };
 
 // ==========================================
