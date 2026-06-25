@@ -8,7 +8,8 @@ const withPWA = withPWAInit({
   swMinify: true,
   disable: false, // Ensure it is always active
   workboxOptions: {
-    skipWaiting: true,
+    skipWaiting: true,    // New SW activates immediately without waiting for old tabs to close
+    clientsClaim: true,   // New SW takes control of ALL open tabs instantly on activation
     disableDevLogs: true,
   },
 });
