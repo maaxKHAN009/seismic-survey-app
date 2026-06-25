@@ -622,8 +622,18 @@ const uploadBlobToR2 = async (
 // ==========================================
 
 /**
- * Converts a HEIC/HEIF file to JPEG in the browser using heic2any.
- * If the file is not HEIC/HEIF, returns it unchanged.
+ * Converts a HEIC/HEIF file to JPEG in the browser.
+ *
+ * Strategy (in order):
+ *  1. Native canvas conversion — uses createImageBitmap which works natively
+ *     in iOS/macOS Safari (the OS has built-in HEIC support). Zero dependencies.
+ *  2. heic2any fallback — for desktop browsers (Chrome, Firefox) that lack
+ *     native HEIC support but can run the WASM-based library.
+ *  3. Original file — if both fail, upload unchanged so the user isn't blocked.
+ *
+ * NOTE: heic2any's internal Web Worker crashes in Safari/WebKit with
+ *   "Cannot read properties of undefined (reading 'addListener')"
+ * which is why canvas is tried FIRST for iPhone users.
  */
 const convertHeicToJpeg = async (file: File): Promise<File> => {
   const isHeic =
@@ -633,23 +643,48 @@ const convertHeicToJpeg = async (file: File): Promise<File> => {
 
   if (!isHeic) return file;
 
+  const newName = file.name.replace(/\.hei[cf]$/i, '.jpg');
+
+  // ── Strategy 1: Native canvas (iOS Safari / macOS Safari) ──────────────────
   try {
-    // Dynamic import keeps heic2any out of the initial bundle (it's large)
-    const heic2any = (await import('heic2any')).default;
-    const converted = await heic2any({
-      blob: file,
-      toType: 'image/jpeg',
-      quality: 0.85,
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not get 2D canvas context');
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close();
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error('canvas.toBlob returned null'))),
+        'image/jpeg',
+        0.85
+      );
     });
 
-    // heic2any may return a single Blob or an array of Blobs (for multi-image HEIC)
-    const resultBlob = Array.isArray(converted) ? converted[0] : converted;
-    const newName = file.name.replace(/\.hei[cf]$/i, '.jpg');
-    return new File([resultBlob], newName, { type: 'image/jpeg' });
-  } catch (err) {
-    console.warn('HEIC conversion failed, using original file:', err);
-    return file;
+    console.log('HEIC converted via native canvas:', newName);
+    return new File([blob], newName, { type: 'image/jpeg' });
+  } catch (canvasErr) {
+    console.warn('Native canvas HEIC conversion failed, trying heic2any:', canvasErr);
   }
+
+  // ── Strategy 2: heic2any WASM library (Chrome / Firefox on desktop) ────────
+  try {
+    // Dynamic import keeps this large library out of the initial bundle
+    const heic2any = (await import('heic2any')).default;
+    const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+    // heic2any may return a Blob or Blob[] (burst/multi-image HEIC)
+    const resultBlob = Array.isArray(converted) ? converted[0] : converted;
+    console.log('HEIC converted via heic2any:', newName);
+    return new File([resultBlob], newName, { type: 'image/jpeg' });
+  } catch (heicErr) {
+    console.warn('heic2any conversion also failed, uploading original file:', heicErr);
+  }
+
+  // ── Strategy 3: Give up gracefully — upload original ───────────────────────
+  return file;
 };
 
 // ==========================================
