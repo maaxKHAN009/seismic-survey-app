@@ -279,7 +279,8 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Dry/No mortar', 'Mud mortar', 'Cement-sand mortar'] },
       { id: 'through_stone_provision', label: 'Through stone', type: 'select', options: ['Provided', 'Not provided'] },
       { id: 'through_stone_spacing', label: 'Through stone typical spacing', type: 'number', displayWhen: { fieldId: 'through_stone_provision', equals: 'Provided' } },
-      { id: 'orthogonal_wall_connection', label: 'Connection between orthogonal walls', type: 'select', options: ['through stone provided', 'not adequate connection'] },
+      { id: 'orthogonal_wall_connection', label: 'Connection between orthogonal walls', type: 'select', options: ['through stone provided', 'not adequate connection', 'other'] },
+      { id: 'orthogonal_wall_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'orthogonal_wall_connection', equals: 'other' } },
       { id: 'external_wall_thickness_category', label: 'External Wall Thickness(in)', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
       { id: 'external_wall_thickness_specific', label: 'External Wall Thickness(in) - specific', type: 'number', displayWhen: { fieldId: 'external_wall_thickness_category', equals: 'specific thickness' } },
       { id: 'internal_wall_thickness_category', label: 'Internal Wall Thickness(in)', type: 'select', options: ['<15"', '15"', '18"', '>18"', 'specific thickness'] },
@@ -300,13 +301,13 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'verandah_column_width', label: 'Verandah column size - Width (in)', type: 'number', displayWhen: { fieldId: 'has_verandah', equals: 'Yes' } },
       { id: 'verandah_column_depth', label: 'Verandah column size - Depth (in)', type: 'number', displayWhen: { fieldId: 'has_verandah', equals: 'Yes' } },
       { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
-      { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
+      { id: 'floor_type_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
       { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
-      { id: 'floor_wall_connection_other', label: 'Connection of floor to wall - other', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
+      { id: 'floor_wall_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
       { id: 'roof_type', label: 'Type of roof', type: 'select', options: ROOF_OPTIONS },
-      { id: 'roof_type_other', label: 'Type of roof - other', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
+      { id: 'roof_type_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
       { id: 'roof_wall_connection', label: 'Connection of roof to wall', type: 'select', options: ROOF_CONNECTION_OPTIONS },
-      { id: 'roof_wall_connection_other', label: 'Connection of roof to wall - other', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
+      { id: 'roof_wall_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
     ]
   },
   {
@@ -331,7 +332,8 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'size_of_timber_laces_depth', label: 'Size of timber laces - Depth (in)', type: 'number' },
       { id: 'longitudinal_cross_connection', label: 'Connection between longitudinal timber laces and cross members', type: 'select', options: ['nailed', 'half connection'] },
       { id: 'spacing_of_cross_members', label: 'Spacing of cross members', type: 'number' },
-      { id: 'corner_timber_connection', label: 'Connection between timber laces at wall corner', type: 'select', options: ['No connection', 'Nailed', 'Half connection with projection', 'half connection without projection'] },
+      { id: 'corner_timber_connection', label: 'Connection between timber laces at wall corner', type: 'select', options: ['No connection', 'Nailed', 'Half connection with projection', 'half connection without projection', 'other'] },
+      { id: 'corner_timber_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'corner_timber_connection', equals: 'other' } },
       { id: 'window_size_length', label: 'Typical size of window - Length (ft)', type: 'number' },
       { id: 'window_size_height', label: 'Typical size of window - Height (ft)', type: 'number' },
       { id: 'door_size_length', label: 'Typical size of door - Length (ft)', type: 'number' },
@@ -348,13 +350,13 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'verandah_column_width', label: 'Verandah column size - Width (in)', type: 'number', displayWhen: { fieldId: 'has_verandah', equals: 'Yes' } },
       { id: 'verandah_column_depth', label: 'Verandah column size - Depth (in)', type: 'number', displayWhen: { fieldId: 'has_verandah', equals: 'Yes' } },
       { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
-      { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
+      { id: 'floor_type_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
       { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
-      { id: 'floor_wall_connection_other', label: 'Connection of floor to wall - other', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
+      { id: 'floor_wall_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
       { id: 'roof_type', label: 'Type of roof', type: 'select', options: ROOF_OPTIONS },
-      { id: 'roof_type_other', label: 'Type of roof - other', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
+      { id: 'roof_type_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
       { id: 'roof_wall_connection', label: 'Connection of roof to wall', type: 'select', options: ROOF_CONNECTION_OPTIONS },
-      { id: 'roof_wall_connection_other', label: 'Connection of roof to wall - other', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
+      { id: 'roof_wall_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
     ]
   },
   {
@@ -387,7 +389,8 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'lintel_beam_material', label: 'Material of lintel beam', type: 'select', options: ['Wooden beam', 'Stone beam', 'RC beam', 'other'], displayWhen: { fieldId: 'lintel_beam_provided', equals: 'Yes' } },
       { id: 'lintel_beam_material_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'lintel_beam_material', equals: 'other' } },
       { id: 'opening_alignment_vertical', label: 'Opening alignment in vertical direction', type: 'select', options: ['Aligned', 'Not aligned'], displayWhen: { fieldId: 'no_of_storey', equals: 'double storey' } },
-      { id: 'wall_column_connection', label: 'Connection between stone masonry wall and vertical confining column', type: 'select', options: ['Toothing provided', 'Not provided'] },
+      { id: 'wall_column_connection', label: 'Connection between stone masonry wall and vertical confining column', type: 'select', options: ['Toothing provided', 'Not provided', 'other'] },
+      { id: 'wall_column_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'wall_column_connection', equals: 'other' } },
       { id: 'vertical_confining_width', label: 'Vertical confining element/column size - Width (in)', type: 'number' },
       { id: 'vertical_confining_depth', label: 'Vertical confining element/column size - Depth (in)', type: 'number' },
       { id: 'vertical_confining_location', label: 'Location of vertical confining element/column', type: 'select', options: ['At all corners only', 'At some corners', 'Intermediate elements are also provided'] },
@@ -412,13 +415,13 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'verandah_column_width', label: 'Verandah column size - Width (in)', type: 'number', displayWhen: { fieldId: 'has_verandah', equals: 'Yes' } },
       { id: 'verandah_column_depth', label: 'Verandah column size - Depth (in)', type: 'number', displayWhen: { fieldId: 'has_verandah', equals: 'Yes' } },
       { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
-      { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
+      { id: 'floor_type_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
       { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
-      { id: 'floor_wall_connection_other', label: 'Connection of floor to wall - other', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
+      { id: 'floor_wall_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
       { id: 'roof_type', label: 'Type of roof', type: 'select', options: ROOF_OPTIONS },
-      { id: 'roof_type_other', label: 'Type of roof - other', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
+      { id: 'roof_type_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
       { id: 'roof_wall_connection', label: 'Connection of roof to wall', type: 'select', options: ROOF_CONNECTION_OPTIONS },
-      { id: 'roof_wall_connection_other', label: 'Connection of roof to wall - other', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
+      { id: 'roof_wall_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
     ]
   },
   {
@@ -435,7 +438,8 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'construction_material_availability', label: 'Construction material availability', type: 'select', options: ['Available', 'Not available'] },
       { id: 'construction_material_distance', label: 'Construction material distance(km)', type: 'number' },
       { id: 'type_of_mortar', label: 'Type of mortar', type: 'select', options: ['Mud mortar', 'Cement-sand mortar'] },
-      { id: 'orthogonal_wall_connection', label: 'Connection between orthogonal walls', type: 'select', options: ['adequate with proper overlap', 'not adequate connection'] },
+      { id: 'orthogonal_wall_connection', label: 'Connection between orthogonal walls', type: 'select', options: ['adequate with proper overlap', 'not adequate connection', 'other'] },
+      { id: 'orthogonal_wall_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'orthogonal_wall_connection', equals: 'other' } },
       { id: 'wall_thickness', label: 'Wall Thickness(in)', type: 'number' },
       { id: 'window_size_length', label: 'Typical size of window - Length (ft)', type: 'number' },
       { id: 'window_size_height', label: 'Typical size of window - Height (ft)', type: 'number' },
@@ -443,22 +447,23 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'door_size_height', label: 'Typical size of door - Height (ft)', type: 'number' },
       { id: 'room_size_length', label: 'Typical Room Size - Length (ft)', type: 'number' },
       { id: 'room_size_width', label: 'Typical Room Size - Width (ft)', type: 'number' },
-      { id: 'lintel_beam_type', label: 'Type of lintel beam', type: 'select', options: ['Continuous on all opening', 'separate on each opening'] },
+      { id: 'lintel_beam_provided', label: 'Is lintel beam provided?', type: 'select', options: ['Yes', 'No'] },
+      { id: 'lintel_beam_type', label: 'Type of lintel beam', type: 'select', options: ['Continuous on all openings', 'Separate on each opening'], displayWhen: { fieldId: 'lintel_beam_provided', equals: 'Yes' } },
+      { id: 'lintel_beam_material', label: 'Material of lintel beam', type: 'select', options: ['Wooden beam', 'Stone beam', 'RC beam', 'other'], displayWhen: { fieldId: 'lintel_beam_provided', equals: 'Yes' } },
+      { id: 'lintel_beam_material_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'lintel_beam_material', equals: 'other' } },
       { id: 'opening_alignment_vertical', label: 'Opening alignment in vertical direction', type: 'select', options: ['Aligned', 'Not aligned'], displayWhen: { fieldId: 'no_of_storey', equals: 'double storey' } },
-      { id: 'lintel_beam_material', label: 'Material of lintel beam', type: 'select', options: ['wooden beam', 'stone beam', 'RC beam', 'other'] },
-      { id: 'lintel_beam_material_other', label: 'Material of lintel beam - other', type: 'text', displayWhen: { fieldId: 'lintel_beam_material', equals: 'other' } },
       { id: 'has_verandah', label: 'Does the building have a verandah?', type: 'select', options: ['Yes', 'No'] },
       { id: 'verandah_column_type', label: 'Verandah column material', type: 'select', options: ['RC Column', 'Wooden Column', 'Stone Masonry Column'], displayWhen: { fieldId: 'has_verandah', equals: 'Yes' } },
       { id: 'verandah_column_width', label: 'Verandah column size - Width (in)', type: 'number', displayWhen: { fieldId: 'has_verandah', equals: 'Yes' } },
       { id: 'verandah_column_depth', label: 'Verandah column size - Depth (in)', type: 'number', displayWhen: { fieldId: 'has_verandah', equals: 'Yes' } },
       { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
-      { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
+      { id: 'floor_type_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
       { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
-      { id: 'floor_wall_connection_other', label: 'Connection of floor to wall - other', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
+      { id: 'floor_wall_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
       { id: 'roof_type', label: 'Type of roof', type: 'select', options: ROOF_OPTIONS },
-      { id: 'roof_type_other', label: 'Type of roof - other', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
+      { id: 'roof_type_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
       { id: 'roof_wall_connection', label: 'Connection of roof to wall', type: 'select', options: ROOF_CONNECTION_OPTIONS },
-      { id: 'roof_wall_connection_other', label: 'Connection of roof to wall - other', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
+      { id: 'roof_wall_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
     ]
   },
   {
@@ -487,7 +492,8 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'lintel_beam_material', label: 'Material of lintel beam', type: 'select', options: ['Wooden beam', 'Stone beam', 'RC beam', 'other'], displayWhen: { fieldId: 'lintel_beam_provided', equals: 'Yes' } },
       { id: 'lintel_beam_material_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'lintel_beam_material', equals: 'other' } },
       { id: 'opening_alignment_vertical', label: 'Opening alignment in vertical direction', type: 'select', options: ['Aligned', 'Not aligned'], displayWhen: { fieldId: 'no_of_storey', equals: 'double storey' } },
-      { id: 'wall_column_connection', label: 'Connection between block masonry wall and vertical confining column', type: 'select', options: ['Toothing provided', 'Not provided'] },
+      { id: 'wall_column_connection', label: 'Connection between block masonry wall and vertical confining column', type: 'select', options: ['Toothing provided', 'Not provided', 'other'] },
+      { id: 'wall_column_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'wall_column_connection', equals: 'other' } },
       { id: 'vertical_confining_width', label: 'Vertical confining element/column size - Width (in)', type: 'number' },
       { id: 'vertical_confining_depth', label: 'Vertical confining element/column size - Depth (in)', type: 'number' },
       { id: 'vertical_confining_location', label: 'Location of vertical confining element/column', type: 'select', options: ['At all corners only', 'At some corners', 'Intermediate elements are also provided'] },
@@ -512,13 +518,13 @@ const TYPOLOGY_DEFINITIONS: TypologyDefinition[] = [
       { id: 'verandah_column_width', label: 'Verandah column size - Width (in)', type: 'number', displayWhen: { fieldId: 'has_verandah', equals: 'Yes' } },
       { id: 'verandah_column_depth', label: 'Verandah column size - Depth (in)', type: 'number', displayWhen: { fieldId: 'has_verandah', equals: 'Yes' } },
       { id: 'floor_type', label: 'Type of floor', type: 'select', options: FLOOR_OPTIONS },
-      { id: 'floor_type_other', label: 'Type of floor - other', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
+      { id: 'floor_type_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'floor_type', equals: 'other' } },
       { id: 'floor_wall_connection', label: 'Connection of floor to wall', type: 'select', options: FLOOR_CONNECTION_OPTIONS },
-      { id: 'floor_wall_connection_other', label: 'Connection of floor to wall - other', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
+      { id: 'floor_wall_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'floor_wall_connection', equals: 'other' } },
       { id: 'roof_type', label: 'Type of roof', type: 'select', options: ROOF_OPTIONS },
-      { id: 'roof_type_other', label: 'Type of roof - other', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
+      { id: 'roof_type_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'roof_type', equals: 'other' } },
       { id: 'roof_wall_connection', label: 'Connection of roof to wall', type: 'select', options: ROOF_CONNECTION_OPTIONS },
-      { id: 'roof_wall_connection_other', label: 'Connection of roof to wall - other', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
+      { id: 'roof_wall_connection_other', label: 'Specify', type: 'text', displayWhen: { fieldId: 'roof_wall_connection', equals: 'other' } }
     ]
   }
 ];
