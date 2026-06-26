@@ -1297,6 +1297,32 @@ export default function BuildingForm() {
     }
   };
 
+  const purgeAllRecordsWithoutPhotos = async () => {
+    if (reports.length === 0) {
+      alert('No records to purge');
+      return;
+    }
+    if (!window.confirm(`Purge ALL ${reports.length} records permanently? Photos in R2 will NOT be deleted. This cannot be undone.`)) return;
+    
+    try {
+      console.log(`Deleting ALL ${reports.length} records without deleting R2 files`);
+      
+      const { error } = await supabase.from('building_reports').delete().not('id', 'is', null);
+      if (error) {
+        console.error('Database delete error:', error);
+        alert(`Error deleting records: ${error.message}`);
+        return;
+      }
+      
+      setBatchSelectedReports(new Set());
+      await loadReports();
+      alert(`Successfully purged all records from database.`);
+    } catch (err) {
+      console.error('Purge error:', err);
+      alert(`Purge failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
   const applySections = (nextSections: Section[]) => {
     setSections(nextSections);
     if (nextSections.length > 0) {
@@ -3114,6 +3140,7 @@ export default function BuildingForm() {
                        <button onClick={deleteSelected} className="bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded">🗑️ PURGE ({batchSelectedReports.size})</button>
                      </>
                    )}
+                   <button onClick={purgeAllRecordsWithoutPhotos} className="bg-orange-600 text-white text-[10px] font-bold px-3 py-1 rounded">⚠️ PURGE ALL</button>
                    <button onClick={() => setShowAuditLog(!showAuditLog)} className="bg-blue-600 text-white text-[10px] font-bold px-3 py-1 rounded">📋 AUDIT LOG</button>
                  </div>
              </div>
