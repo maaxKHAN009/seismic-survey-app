@@ -5,7 +5,6 @@ const withPWA = withPWAInit({
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
-  swMinify: true,
   disable: false,
   workboxOptions: {
     skipWaiting: true,       // New SW activates immediately
