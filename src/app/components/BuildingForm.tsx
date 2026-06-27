@@ -4,7 +4,6 @@
 // 1. IMPORTS & CONFIGURATION
 // ==========================================
 import { supabase } from '@/lib/supabase';
-import { PROFORMA_SECTIONS } from '@/proforma_schema';
 import React, { useState, useEffect, useRef } from 'react';
 import Dexie, { type Table } from 'dexie';
 import ExcelJS from 'exceljs';
@@ -94,7 +93,7 @@ interface OutboxEntry {
   timestamp: number;
 }
 
-const DEFAULT_SECTIONS: Section[] = PROFORMA_SECTIONS as Section[];
+// Hard-coded default sections removed - app relies entirely on downloaded schema
 
 type TypologyFieldType = 'text' | 'number' | 'select';
 
@@ -1327,6 +1326,8 @@ export default function BuildingForm() {
     setSections(nextSections);
     if (nextSections.length > 0) {
       setTargetSectionId(nextSections[0].id);
+    } else {
+      setTargetSectionId('null');
     }
   };
 
@@ -1381,7 +1382,7 @@ export default function BuildingForm() {
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           applySections(parsed);
           return;
         }
@@ -1390,7 +1391,8 @@ export default function BuildingForm() {
       }
     }
 
-    applySections(DEFAULT_SECTIONS);
+    // No remote data and no cache found
+    applySections([]);
   };
 
   const loadReports = async () => { 
@@ -1559,10 +1561,19 @@ export default function BuildingForm() {
   }, []);
 
   const handleAppUpdateNow = async () => {
+    const proceed = window.confirm("WARNING: App settings and cached schema will be wiped to ensure a clean update.\n\nHowever, any surveys you have pending for push will NOT get wiped and will stay there ready to be pushed.\n\nProceed with update?");
+    if (!proceed) return;
+
     setUpdatingApp(true);
     isUpdatingRef.current = true;
 
     try {
+      localStorage.clear();
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+
       await swRegistrationRef.current?.update();
 
       if (swRegistrationRef.current?.waiting) {
@@ -3553,6 +3564,14 @@ export default function BuildingForm() {
 
         {surveyTab === 'general' && (
           <div className="space-y-8">
+            {sections.length === 0 && (
+              <div className="bg-orange-50 text-orange-800 p-6 rounded-2xl border-2 border-orange-200 text-center space-y-4">
+                <AlertTriangle className="mx-auto text-orange-500" size={40} />
+                <h3 className="font-black uppercase text-sm">No Survey Schema Found</h3>
+                <p className="text-xs font-medium">Your device hasn't downloaded the latest survey questions yet.</p>
+                <button onClick={() => window.location.reload()} className="bg-orange-600 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase">Refresh to Download</button>
+              </div>
+            )}
             {sections.map((section, secIdx) => (
               <div key={section.id} className="space-y-4">
                 <div className="flex items-center gap-3 border-b-4 border-[#001F3F] pb-2">
