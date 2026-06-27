@@ -1334,6 +1334,7 @@ export default function BuildingForm() {
     try {
       const { data } = await supabase.from('survey_schema').select('fields').limit(1).single();
       if (data && Array.isArray(data.fields)) {
+        localStorage.setItem('OFFLINE_SCHEMA_CACHE', JSON.stringify(data.fields));
         return data.fields as Section[];
       }
     } catch {
@@ -1374,6 +1375,19 @@ export default function BuildingForm() {
     if (remoteSections) {
       applySections(remoteSections);
       return;
+    }
+
+    const cached = localStorage.getItem('OFFLINE_SCHEMA_CACHE');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          applySections(parsed);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to parse cached schema', e);
+      }
     }
 
     applySections(DEFAULT_SECTIONS);
