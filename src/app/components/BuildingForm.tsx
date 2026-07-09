@@ -1290,9 +1290,17 @@ export default function BuildingForm() {
 
   const checkPending = async () => {
     if (localDB && localDB.outbox) {
-      const pending = await localDB.outbox.toArray();
-      setPendingCount(pending.length);
-      setPendingReports(pending);
+      const lightweightPending: OutboxEntry[] = [];
+      await localDB.outbox.each((item) => {
+        lightweightPending.push({
+          id: item.id,
+          building_id: item.building_id,
+          timestamp: item.timestamp,
+          full_data: {} // Drop payload to prevent React memory crash
+        });
+      });
+      setPendingCount(lightweightPending.length);
+      setPendingReports(lightweightPending);
     }
   };
 
@@ -1993,7 +2001,7 @@ export default function BuildingForm() {
     setBatchSelectedReports(new Set());
   };
   
-  const runSync = async () => {
+  const runSync = async (pushAll = true) => {
     if (!isOnline || syncing) return;
     setSyncing(true);
     try {
@@ -2003,7 +2011,7 @@ export default function BuildingForm() {
         return;
       }
 
-      setSyncTotal(totalPending);
+      setSyncTotal(pushAll ? totalPending : 1);
       setSyncCompleted(0);
       setSyncFailed(0);
       setSyncCurrentBuildingId('');
@@ -2074,11 +2082,14 @@ export default function BuildingForm() {
           // Explicitly drop references to large objects
           report.full_data = {} as any;
         }
+        
+        // If we are only pushing one at a time, break out of the loop after 1 iteration
+        if (!pushAll) break;
       }
 
       await checkPending();
       loadReports();
-      alert(`Sync complete. Uploaded ${successfulSyncs}/${totalPending}${failedSyncs > 0 ? `, Failed ${failedSyncs}` : ''}.`);
+      alert(`Sync complete. Uploaded ${successfulSyncs}/${pushAll ? totalPending : 1}${failedSyncs > 0 ? `, Failed ${failedSyncs}` : ''}.`);
     } catch (e) {
       alert("Sync interrupted.");
     } finally {
@@ -2970,7 +2981,7 @@ export default function BuildingForm() {
           <span className={`text-xs font-black uppercase ${isOnlineForRender ? 'text-green-900' : 'text-orange-900'}`}>{isOnlineForRender ? 'System Online' : 'Offline Vault Active'}</span>
         </div>
         {pendingCount > 0 && isOnlineForRender && (
-          <button onClick={runSync} disabled={syncing} className="bg-[#85144B] text-white px-4 py-2 rounded-lg text-xs font-black animate-pulse flex items-center gap-2 shadow-md">
+          <button onClick={() => runSync(true)} disabled={syncing} className="bg-[#85144B] text-white px-4 py-2 rounded-lg text-xs font-black animate-pulse flex items-center gap-2 shadow-md">
             <RefreshCcw size={14} className={syncing ? 'animate-spin' : ''} /> PUSH {pendingCount}
           </button>
         )}
@@ -3005,13 +3016,22 @@ export default function BuildingForm() {
               <p className="text-[9px] text-slate-500">Saved locally, not pushed yet</p>
             </div>
             {isOnlineForRender && (
-              <button
-                onClick={runSync}
-                disabled={syncing}
-                className="bg-[#85144B] text-white px-3 py-2 rounded-lg text-[10px] font-black flex items-center gap-2"
-              >
-                <RefreshCcw size={12} className={syncing ? 'animate-spin' : ''} /> PUSH ALL
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => runSync(false)}
+                  disabled={syncing}
+                  className="bg-[#39CCCC] text-[#001F3F] px-3 py-2 rounded-lg text-[10px] font-black flex items-center gap-2"
+                >
+                  <RefreshCcw size={12} className={syncing ? 'animate-spin' : ''} /> PUSH NEXT (1)
+                </button>
+                <button
+                  onClick={() => runSync(true)}
+                  disabled={syncing}
+                  className="bg-[#85144B] text-white px-3 py-2 rounded-lg text-[10px] font-black flex items-center gap-2"
+                >
+                  <RefreshCcw size={12} className={syncing ? 'animate-spin' : ''} /> PUSH ALL
+                </button>
+              </div>
             )}
           </div>
 
@@ -3024,9 +3044,12 @@ export default function BuildingForm() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => {
-                      setEditingOutbox(entry);
-                      setEditingOutboxTab('general');
+                    onClick={async () => {
+                      const fullEntry = await localDB.outbox.get(entry.id!);
+                      if (fullEntry) {
+                        setEditingOutbox(fullEntry);
+                        setEditingOutboxTab('general');
+                      }
                     }}
                     className="text-[#001F3F]"
                     title="Edit pending survey"
